@@ -12,9 +12,25 @@ from feed.items import make_item
 
 FIRECRAWL_SCRAPE_URL = "https://api.firecrawl.dev/v2/scrape"
 
+# Byte caps bound memory on a hostile or runaway response. OpenAI's RSS alone holds ~1,250
+# items, so the XML cap needs headroom; one scraped markdown page is far smaller.
+MAX_XML_BYTES = 16 * 1024 * 1024
+MAX_PAGE_BYTES = 8 * 1024 * 1024
+
 
 class FetchError(Exception):
     """A source could not be fetched or parsed. The message is safe to store and show."""
+
+
+def read_capped(response, limit: int) -> bytes:
+    """Read a body, refusing anything over `limit` bytes without buffering more than limit+1.
+
+    `response` is any object with `read(size)`, which is what urlopen returns.
+    """
+    body = response.read(limit + 1)
+    if len(body) > limit:
+        raise FetchError(f"response exceeds the {limit // (1024 * 1024)} MiB limit")
+    return body
 
 
 def firecrawl_markdown(url: str, api_key: str, timeout: int = 90) -> str:
@@ -30,13 +46,14 @@ def firecrawl_markdown(url: str, api_key: str, timeout: int = 90) -> str:
     )
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
-            payload = json.load(response)
+            payload = json.loads(read_capped(response, MAX_PAGE_BYTES))
     except urllib.error.HTTPError as error:
         raise FetchError(f"Firecrawl HTTP {error.code}") from None
-    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as error:
+    except (urllib.error.URLError, TimeoutError, ValueError) as error:  # incl. bad UTF-8 / JSON
         raise FetchError(f"Firecrawl request failed: {type(error).__name__}") from None
-    markdown = (payload.get("data") or {}).get("markdown")
-    if not payload.get("success") or not markdown:
+    data = payload.get("data") if isinstance(payload, dict) else None
+    markdown = data.get("markdown") if isinstance(data, dict) else None
+    if not markdown or not isinstance(markdown, str) or not payload.get("success"):
         raise FetchError("Firecrawl returned no markdown")
     return markdown
 
