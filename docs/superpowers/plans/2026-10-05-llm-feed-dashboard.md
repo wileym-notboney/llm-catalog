@@ -1,5 +1,12 @@
 # LLM Feed Dashboard Implementation Plan
 
+> **Status (2026-10-05): implemented.** The code in every task below was prototyped first and
+> then committed on `feature/llm-feed-dashboard` as 8 commits, one per task (Task 0 is a
+> Hindsight record, not a commit). All 51 tests pass from a fresh clone. This document is now
+> the reference for what each file does and why. Treat the checkboxes as already done, with one
+> exception: the paid Firecrawl check in Task 8, Step 2 (2 credits, panda master's key) is
+> still open. The scrapers are verified only against fixtures built from live pages.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** A self-contained dashboard that shows one merged feed of Anthropic, OpenAI and Nous Research news and changelogs, refreshes itself daily at ≤2 Firecrawl credits and 0 Claude tokens, and is styled with the Mythological Punk theme.
