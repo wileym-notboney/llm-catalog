@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Added a proposed incremental hardening plan, deferred optimization backlog, and Sonnet/Opus implementation and review handoff.
 - Project scaffolding, design spec, implementation plan and normalized item helpers.
 - RSS and Atom parsers with a DTD guard and http(s)-only links.
 - Firecrawl scrape client and parsers for Anthropic news and the Nous blog.
