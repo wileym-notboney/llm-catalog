@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Callable
 
 from feed.items import parse_iso
-from feed.store import read_json, validate_state
+from feed.store import WriterBusy, read_json, validate_state
 
 log = logging.getLogger("feed")
 
@@ -45,6 +45,9 @@ def step(
         if pull_due(last, now, pull_at):
             summary = pull(data_dir, now)
             log.info("pull finished: ok=%s failed=%s", summary["ok"], list(summary["failed"]))
+        return TICK_SECONDS
+    except WriterBusy:  # before the blanket handler: nothing crashed, so no backoff
+        log.warning("another writer owns the data directory; skipping this pull")
         return TICK_SECONDS
     except Exception:
         log.exception("scheduled pull crashed; backing off %ss", BACKOFF_SECONDS)
