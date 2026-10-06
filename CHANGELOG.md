@@ -13,3 +13,4 @@
 - README with run, configuration and launchd/systemd supervision instructions.
 - Plan header marked implemented; paid Firecrawl check still open.
 - AGENTS.md with project names, commands, invariants and gotchas.
+- Every HTTP reader caps its body (16 MiB per XML feed, 8 MiB per scraped page); an over-limit response stales only that source. A Firecrawl success payload of the wrong shape (list, string, non-string markdown) is now a safe FetchError instead of aborting the whole pull, and invalid UTF-8 from Firecrawl gets a normalized, key-free error message.

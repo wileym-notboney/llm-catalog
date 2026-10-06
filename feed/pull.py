@@ -12,7 +12,14 @@ from pathlib import Path
 from typing import Callable
 
 from feed.items import iso
-from feed.scrape_pages import FetchError, firecrawl_markdown, parse_anthropic_news, parse_nous_blog
+from feed.scrape_pages import (
+    MAX_XML_BYTES,
+    FetchError,
+    firecrawl_markdown,
+    parse_anthropic_news,
+    parse_nous_blog,
+    read_capped,
+)
 from feed.store import merge, prune, read_json, write_json
 from feed.xml_feeds import parse_atom, parse_rss
 
@@ -48,7 +55,7 @@ def fetch_text(url: str, timeout: int = 30) -> str:
     request = urllib.request.Request(url, headers={"User-Agent": "llm-catalog/1.0"})
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
-            return response.read().decode("utf-8")
+            return read_capped(response, MAX_XML_BYTES).decode("utf-8")
     except urllib.error.HTTPError as error:
         raise FetchError(f"HTTP {error.code}") from None
 

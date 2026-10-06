@@ -134,3 +134,39 @@ def test_run_prune_works_offline_on_stored_data(tmp_path):
                  for n in range(5)])
     run(tmp_path, feeds(**{"openai-news": many}))
     assert run_prune(tmp_path, NOW) == 0
+
+
+def test_invalid_utf8_from_one_feed_stales_only_that_source(tmp_path):
+    good = feeds()
+
+    def fetch_xml(url):
+        if url == URLS["openai-news"]:
+            return b"\xff\xfe<rss>".decode("utf-8")  # what fetch_text does with a bad body
+        return good(url)
+
+    result = run(tmp_path, fetch_xml=fetch_xml)
+    assert list(result["failed"]) == ["openai-news"]
+    assert len(result["ok"]) == 5
+    assert "https://openai.com/index/p" not in urls(tmp_path)
+    assert "https://platform.claude.com/n#1" in urls(tmp_path)
+
+
+def test_fetch_text_rejects_an_over_limit_feed_without_reading_it_all(monkeypatch):
+    class Endless:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        sizes = []
+
+        def read(self, size=-1):
+            assert size > 0, "unbounded read"
+            self.sizes.append(size)
+            return b"x" * size
+
+    monkeypatch.setattr("urllib.request.urlopen", lambda request, timeout: Endless())
+    with pytest.raises(FetchError, match="16 MiB"):
+        pull_module.fetch_text("https://example.com/feed.xml")
+    assert max(Endless.sizes) <= 16 * 1024 * 1024 + 1
