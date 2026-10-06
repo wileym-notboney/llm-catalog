@@ -2,7 +2,7 @@
 
 > **Status (2026-10-05): implemented.** The code in every task below was prototyped first and
 > then committed on `feature/llm-feed-dashboard` as 8 commits, one per task (Task 0 is a
-> Hindsight record, not a commit). All 51 tests pass from a fresh clone. This document is now
+> Hindsight record, not a commit). All 51 tests passed from a fresh clone at that point. This document is now
 > the reference for what each file does and why. Treat the checkboxes as already done, with one
 > exception: the paid Firecrawl check in Task 8, Step 2, which was completed on 2026-10-06
 > (2 credits, panda master's key; see the hardening plan, H6). The scrapers were verified

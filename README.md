@@ -37,9 +37,12 @@ By hand: `python3 -m feed pull` (fetch, merge, prune) and `python3 -m feed prune
   feeds still refresh. The next UTC day allows a new attempt.
 - **One writer per data directory.** `pull` and `prune` take a lock on
   `DATA_DIR/.writer.lock`. If the server's scheduler or another command already holds it,
-  the CLI prints `another writer owns <dir>; nothing was fetched or written` and exits 3;
+  the CLI prints `error: another writer owns <dir>; nothing was fetched or written` and
+  exits 3;
   the scheduler logs a warning and keeps its one-minute tick without touching `lastPull`.
   The kernel frees the lock when its holder dies, so there is never a stale lock to clear.
+  This serializes writers on one host only: `flock` does not coordinate across hosts, which
+  is why `DATA_DIR` must be on a local filesystem.
 - **Corrupt or misshapen state.** A bad `items.json`, `state.json` or `attempts.json` is
   refused with an error naming the file and exit 2. Nothing is overwritten; fix or remove
   the file yourself.
