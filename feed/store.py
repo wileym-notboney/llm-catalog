@@ -2,11 +2,13 @@
 # ABOUTME: Pure functions over plain dicts so the rules are testable without touching a network.
 from __future__ import annotations
 
+import fcntl
 import json
 import os
+from contextlib import contextmanager
 from datetime import date, datetime, timedelta
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Iterator
 
 from feed.items import iso, parse_iso
 
@@ -17,6 +19,33 @@ TOMBSTONE_TTL = timedelta(days=90)
 
 class StoreError(Exception):
     """A data file exists but cannot be trusted. We refuse to overwrite it."""
+
+
+class WriterBusy(Exception):
+    """Another writer holds the data directory. Deliberately NOT a StoreError: nothing is
+    corrupt and nothing crashed, so callers must map it to its own exit code / scheduler tick."""
+
+
+@contextmanager
+def writer_lock(data_dir: Path) -> Iterator[None]:
+    """Hold DATA_DIR/.writer.lock for a whole read-modify-write transaction, or raise WriterBusy.
+
+    Non-blocking flock with no expiry: the kernel drops it when the fd closes, including on
+    SIGKILL. Each call opens its own fd because flock ownership is per open-file-description
+    (so a scheduler thread and a CLI in one process still exclude each other). The path is
+    resolved here, at call time, so every contender agrees on one file. Any OSError means
+    "not acquired"; errno constants differ between Darwin and Linux, so none is compared.
+    """
+    data_dir.mkdir(parents=True, exist_ok=True)
+    fd = os.open(data_dir / ".writer.lock", os.O_CREAT | os.O_RDWR, 0o600)
+    try:
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            raise WriterBusy(str(data_dir)) from None
+        yield
+    finally:
+        os.close(fd)
 
 
 def _check_iso(value: object, where: str, nullable: bool = False) -> None:

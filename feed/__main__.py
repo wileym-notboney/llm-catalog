@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from feed.pull import fetch_text, markdown_fetcher, run_prune, run_pull
-from feed.store import StoreError
+from feed.store import StoreError, WriterBusy
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -33,6 +33,10 @@ def main(argv: list[str] | None = None) -> int:
             print(f"pruned {run_prune(data_dir, now)} items")
             return 0
         summary = run_pull(data_dir, now, fetch_text, markdown_fetcher())
+    except WriterBusy:
+        print(f"error: another writer owns {data_dir}; nothing was fetched or written",
+              file=sys.stderr)
+        return 3
     except StoreError as error:
         print(f"error: {error}", file=sys.stderr)
         return 2

@@ -29,6 +29,7 @@ from feed.store import (
     validate_catalog,
     validate_state,
     write_json,
+    writer_lock,
 )
 from feed.xml_feeds import parse_atom, parse_rss
 
@@ -53,8 +54,13 @@ SOURCES = (
      "url": "https://github.com/NousResearch/hermes-agent/releases.atom"},
 )
 
-EMPTY_CATALOG = {"generatedAt": None, "sources": {}, "items": []}
-EMPTY_STATE = {"lastPull": None, "lastPrune": None, "tombstones": {}}
+def _empty_catalog() -> dict:
+    """A fresh catalog per call: its nested containers get mutated, so they must never be shared."""
+    return {"generatedAt": None, "sources": {}, "items": []}
+
+
+def _empty_state() -> dict:
+    return {"lastPull": None, "lastPrune": None, "tombstones": {}}
 
 FetchText = Callable[[str], str]
 FetchMarkdown = Callable[[str], str]
@@ -116,14 +122,21 @@ def save_pruned_attempts(data_dir: Path, attempts: dict, now: datetime) -> None:
 def run_pull(
     data_dir: Path, now: datetime, fetch_xml: FetchText, fetch_md: FetchMarkdown | None
 ) -> dict:
-    """Pull every source once.
+    """Pull every source once, as the data directory's only writer (raises WriterBusy otherwise).
 
     Returns {"ok": [ids], "failed": {id: reason}, "deferred": [ids]}. A paid source gets at most
     one request per UTC day: the attempt is saved to attempts.json BEFORE the request and counts
     whether the request succeeds, fails or the process dies. Deferred sources are not failures.
     """
-    catalog = read_json(data_dir / "items.json", dict(EMPTY_CATALOG), validate_catalog)
-    state = read_json(data_dir / "state.json", dict(EMPTY_STATE), validate_state)
+    with writer_lock(data_dir):
+        return _pull_locked(data_dir, now, fetch_xml, fetch_md)
+
+
+def _pull_locked(
+    data_dir: Path, now: datetime, fetch_xml: FetchText, fetch_md: FetchMarkdown | None
+) -> dict:
+    catalog = read_json(data_dir / "items.json", _empty_catalog(), validate_catalog)
+    state = read_json(data_dir / "state.json", _empty_state(), validate_state)
     attempts = read_attempts(data_dir)
     incoming, ok, failed, deferred = [], [], {}, []
     for source in SOURCES:
@@ -164,9 +177,17 @@ def run_pull(
 
 
 def run_prune(data_dir: Path, now: datetime) -> int:
-    """Prune stored data without fetching anything. Returns how many items were dropped."""
-    catalog = read_json(data_dir / "items.json", dict(EMPTY_CATALOG), validate_catalog)
-    state = read_json(data_dir / "state.json", dict(EMPTY_STATE), validate_state)
+    """Prune stored data without fetching anything, as the only writer (raises WriterBusy otherwise).
+
+    Returns how many items were dropped.
+    """
+    with writer_lock(data_dir):
+        return _prune_locked(data_dir, now)
+
+
+def _prune_locked(data_dir: Path, now: datetime) -> int:
+    catalog = read_json(data_dir / "items.json", _empty_catalog(), validate_catalog)
+    state = read_json(data_dir / "state.json", _empty_state(), validate_state)
     attempts = read_attempts(data_dir)
     before = len(catalog["items"])
     catalog["items"], state["tombstones"] = prune(catalog["items"], state["tombstones"], now)
