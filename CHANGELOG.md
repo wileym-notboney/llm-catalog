@@ -10,3 +10,4 @@
 - serve.py: static server plus daily scheduler with catch-up on start and crash backoff.
 - Dashboard UI in the Mythological Punk theme, committed as app/dist/index.html.
 - README with run, configuration and launchd/systemd supervision instructions.
+- Plan header marked implemented; paid Firecrawl check still open.
