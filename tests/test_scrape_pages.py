@@ -92,3 +92,36 @@ def test_firecrawl_rejects_an_empty_result(monkeypatch):
     )
     with pytest.raises(FetchError, match="no markdown"):
         firecrawl_markdown("https://example.com", "k")
+
+
+SENTINEL_KEY = "fc-SENTINEL-not-a-real-key"
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [b"\x80\x81 not utf-8", b"[1, 2]", b'"text"', b'{"success": true, "data": "x"}',
+     b'{"success": true, "data": {"markdown": 5}}'],
+)
+def test_firecrawl_bad_payloads_are_safe_fetch_errors(monkeypatch, raw):
+    monkeypatch.setattr("urllib.request.urlopen", lambda request, timeout: _Response(raw))
+    with pytest.raises(FetchError) as caught:
+        firecrawl_markdown("https://example.com", SENTINEL_KEY)
+    message = str(caught.value)
+    assert SENTINEL_KEY not in message
+    assert "Authorization" not in message and "Bearer" not in message
+
+
+def test_firecrawl_rejects_an_over_limit_body_without_reading_it_all(monkeypatch):
+    class Endless(_Response):
+        read_sizes = []
+
+        def read(self, size=-1):
+            assert size > 0, "unbounded read"
+            self.read_sizes.append(size)
+            return b"x" * size
+
+    monkeypatch.setattr("urllib.request.urlopen", lambda request, timeout: Endless())
+    with pytest.raises(FetchError, match="8 MiB") as caught:
+        firecrawl_markdown("https://example.com", SENTINEL_KEY)
+    assert SENTINEL_KEY not in str(caught.value)
+    assert max(Endless.read_sizes) <= 8 * 1024 * 1024 + 1
