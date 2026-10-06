@@ -1,0 +1,120 @@
+# ABOUTME: Orchestrates one pull: fetch every source, merge into items.json, then prune.
+# ABOUTME: A failing source keeps its old items and is marked stale; it never empties the feed.
+from __future__ import annotations
+
+import logging
+import os
+import urllib.error
+import urllib.request
+import xml.etree.ElementTree as ET
+from datetime import datetime
+from pathlib import Path
+from typing import Callable
+
+from feed.items import iso
+from feed.scrape_pages import FetchError, firecrawl_markdown, parse_anthropic_news, parse_nous_blog
+from feed.store import merge, prune, read_json, write_json
+from feed.xml_feeds import parse_atom, parse_rss
+
+log = logging.getLogger("feed")
+
+# Pipeline tags that would flood the feed: hermes-agent publishes a canary daily plus
+# rc.N / abandoned-rc.N tags whose bodies are JSON, not release notes.
+SKIP_PRERELEASE = r"canary|nightly|abandoned|\brc[.-]?\d"
+
+SOURCES = (
+    {"id": "anthropic-news", "via": "firecrawl", "url": "https://www.anthropic.com/news",
+     "parse": parse_anthropic_news},
+    {"id": "anthropic-api-notes", "via": "rss", "lab": "anthropic", "kind": "changelog",
+     "url": "https://platform.claude.com/docs/en/release-notes/feed.xml"},
+    {"id": "claude-code-releases", "via": "atom", "lab": "anthropic", "kind": "release",
+     "url": "https://github.com/anthropics/claude-code/releases.atom"},
+    {"id": "openai-news", "via": "rss", "lab": "openai", "kind": "news",
+     "url": "https://openai.com/news/rss.xml"},
+    {"id": "nous-blog", "via": "firecrawl", "url": "https://nousresearch.com/blog",
+     "parse": parse_nous_blog},
+    {"id": "hermes-agent-releases", "via": "atom", "lab": "nous", "kind": "release",
+     "url": "https://github.com/NousResearch/hermes-agent/releases.atom"},
+)
+
+EMPTY_CATALOG = {"generatedAt": None, "sources": {}, "items": []}
+EMPTY_STATE = {"lastPull": None, "lastPrune": None, "tombstones": {}}
+
+FetchText = Callable[[str], str]
+FetchMarkdown = Callable[[str], str]
+
+
+def fetch_text(url: str, timeout: int = 30) -> str:
+    request = urllib.request.Request(url, headers={"User-Agent": "llm-catalog/1.0"})
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            return response.read().decode("utf-8")
+    except urllib.error.HTTPError as error:
+        raise FetchError(f"HTTP {error.code}") from None
+
+
+def markdown_fetcher() -> FetchMarkdown | None:
+    """A Firecrawl fetcher built from FIRECRAWL_API_KEY, or None when no key is set."""
+    api_key = os.environ.get("FIRECRAWL_API_KEY")
+    if not api_key:
+        return None
+    return lambda url: firecrawl_markdown(url, api_key)
+
+
+def collect(source: dict, fetch_xml: FetchText, fetch_md: FetchMarkdown | None) -> list[dict]:
+    """Fetch and parse one source into normalized items."""
+    if source["via"] == "firecrawl":
+        if fetch_md is None:
+            raise FetchError("FIRECRAWL_API_KEY not set")
+        return source["parse"](fetch_md(source["url"]), source=source["id"])
+    labels = {"lab": source["lab"], "kind": source["kind"], "source": source["id"]}
+    xml_text = fetch_xml(source["url"])
+    if source["via"] == "rss":
+        return parse_rss(xml_text, **labels)
+    return parse_atom(xml_text, skip_title=SKIP_PRERELEASE, **labels)
+
+
+def run_pull(
+    data_dir: Path, now: datetime, fetch_xml: FetchText, fetch_md: FetchMarkdown | None
+) -> dict:
+    """Pull every source once. Returns {"ok": [source ids], "failed": {source id: reason}}."""
+    catalog = read_json(data_dir / "items.json", dict(EMPTY_CATALOG))
+    state = read_json(data_dir / "state.json", dict(EMPTY_STATE))
+    incoming, ok, failed = [], [], {}
+    for source in SOURCES:
+        status = catalog["sources"].setdefault(source["id"], {"lastOk": None, "lastError": None})
+        try:
+            found = collect(source, fetch_xml, fetch_md)
+            if not found:
+                raise FetchError("parsed 0 items")
+        except (FetchError, OSError, ET.ParseError, ValueError) as error:
+            status["lastError"] = str(error)[:200]
+            failed[source["id"]] = status["lastError"]
+            log.warning("source %s failed: %s", source["id"], status["lastError"])
+            continue
+        status.update(lastOk=iso(now), lastError=None)
+        incoming.extend(found)
+        ok.append(source["id"])
+    items = merge(catalog["items"], incoming, state["tombstones"], now)
+    try:
+        items, state["tombstones"] = prune(items, state["tombstones"], now)
+        state["lastPrune"] = iso(now)
+    except Exception:  # prune must never cost us the freshly merged items
+        log.exception("prune failed; keeping unpruned items")
+    state["lastPull"] = iso(now)
+    catalog.update(generatedAt=iso(now), items=items)
+    write_json(data_dir / "items.json", catalog)
+    write_json(data_dir / "state.json", state)
+    return {"ok": ok, "failed": failed}
+
+
+def run_prune(data_dir: Path, now: datetime) -> int:
+    """Prune stored data without fetching anything. Returns how many items were dropped."""
+    catalog = read_json(data_dir / "items.json", dict(EMPTY_CATALOG))
+    state = read_json(data_dir / "state.json", dict(EMPTY_STATE))
+    before = len(catalog["items"])
+    catalog["items"], state["tombstones"] = prune(catalog["items"], state["tombstones"], now)
+    state["lastPrune"] = iso(now)
+    write_json(data_dir / "items.json", catalog)
+    write_json(data_dir / "state.json", state)
+    return before - len(catalog["items"])
