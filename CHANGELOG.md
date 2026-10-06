@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Each paid Firecrawl source (Anthropic news, Nous blog) is requested at most once per UTC day, even across a crash, CLI re-run or supervisor restart: the attempt is saved to data/attempts.json before the request and counts whether the request succeeds, fails or the process dies. A second pull that day defers just that source (shown stale, old items kept) while free feeds keep refreshing; a corrupt attempts file is refused rather than trusted. Old records are pruned with state maintenance.
 - items.json and state.json are shape-checked on read: a valid-JSON file with the wrong dashboard shape is refused with a StoreError naming the file (CLI exits 2, scheduler backs off) before anything is written; unknown fields are preserved.
 - Added a proposed incremental hardening plan, deferred optimization backlog, and Sonnet/Opus implementation and review handoff.
 - Project scaffolding, design spec, implementation plan and normalized item helpers.

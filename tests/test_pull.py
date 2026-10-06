@@ -1,7 +1,7 @@
 # ABOUTME: Tests for one full pull across all six sources, using injected fakes (no network).
 # ABOUTME: Covers stale handling, empty-parse protection, tombstones and prune-failure safety.
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -87,7 +87,8 @@ def test_malformed_xml_is_a_stale_source_not_a_crash(tmp_path):
 
 def test_a_layout_change_that_parses_zero_items_is_stale_and_keeps_old_items(tmp_path):
     run(tmp_path)
-    summary = run(tmp_path, fetch_md=pages(**{"nous-blog": "<html>redesigned</html>"}))
+    next_day = NOW + timedelta(days=1)  # a paid source is requested once per UTC day
+    summary = run(tmp_path, fetch_md=pages(**{"nous-blog": "<html>redesigned</html>"}), now=next_day)
     assert summary["failed"] == {"nous-blog": "parsed 0 items"}
     assert "https://nousresearch.com/lighthouse-attention" in urls(tmp_path)
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import os
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Callable
 
@@ -67,6 +67,21 @@ def validate_state(data: object) -> None:
         _check_iso(data.get(key), f"'{key}'", nullable=True)
     for item_id, stamp in data["tombstones"].items():
         _check_iso(stamp, f"tombstone {item_id!r}")
+
+
+def validate_attempts(data: object) -> None:
+    """Raise ValueError if `data` is not a usable attempts.json."""
+    _check_type(data, dict, "attempts file")
+    _check_type(data.get("attempts"), dict, "'attempts'")
+    for source_id, record in data["attempts"].items():
+        where = f"attempt {source_id!r}"
+        _check_type(record, dict, where)
+        _check_type(record.get("date"), str, f"{where} date")
+        try:
+            date.fromisoformat(record["date"])
+        except ValueError:
+            raise ValueError(f"{where} date must be YYYY-MM-DD, got {record['date']!r}") from None
+        _check_iso(record.get("at"), f"{where} at")
 
 
 def read_json(path: Path, default: dict, validate: Callable[[object], None] | None = None) -> dict:
@@ -133,3 +148,10 @@ def prune(items: list[dict], tombstones: dict, now: datetime) -> tuple[list[dict
     }
     fresh.update({item["id"]: iso(now) for item in dropped})
     return kept, fresh
+
+
+def prune_attempts(attempts: dict, now: datetime) -> dict:
+    """Drop paid-attempt records from before today (UTC); only today's still block a call."""
+    today = now.date().isoformat()
+    return {"attempts": {sid: rec for sid, rec in attempts["attempts"].items()
+                         if rec["date"] >= today}}

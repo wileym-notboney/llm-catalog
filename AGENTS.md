@@ -45,10 +45,13 @@ module per feed module plus `fixtures.py`. `data/` is runtime state and git-igno
   why pruned items don't come back from long source feeds; don't remove them.
 - A source that fails, or parses 0 items, goes stale and keeps its old items. Never let it
   empty the feed. A corrupt `items.json` is refused, never treated as empty.
-- Only `app/dist` and `/items.json` are served; `state.json` must 404. Bind 127.0.0.1.
+- Only `app/dist` and `/items.json` are served; `state.json` and `attempts.json` must 404. Bind 127.0.0.1.
 - Only http(s) links reach the page. XML with a DTD/entity is rejected.
 - Per-source status lives only in `items.json`; `state.json` holds `lastPull`, `lastPrune`,
   `tombstones`. One source of truth.
+- `data/attempts.json` holds one record per paid source per UTC day (`{"attempts": {id:
+  {"date", "at"}}}`), written before the request, never served, never committed. A corrupt
+  file is refused, not read as empty. H5's writer lock must cover it, not just items/state.
 
 ## Gotchas learned the hard way
 
