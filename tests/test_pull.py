@@ -1,5 +1,6 @@
 # ABOUTME: Tests for one full pull across all six sources, using injected fakes (no network).
 # ABOUTME: Covers stale handling, empty-parse protection, tombstones and prune-failure safety.
+import json
 from datetime import datetime, timezone
 
 import pytest
@@ -134,3 +135,83 @@ def test_run_prune_works_offline_on_stored_data(tmp_path):
                  for n in range(5)])
     run(tmp_path, feeds(**{"openai-news": many}))
     assert run_prune(tmp_path, NOW) == 0
+
+
+GOOD_ITEM = {
+    "id": "a", "lab": "openai", "kind": "news", "title": "t", "summary": "", "url": "https://x/a",
+    "publishedAt": "2026-10-04T08:00:00Z", "source": "openai-news",
+    "firstSeenAt": "2026-10-04T09:00:00Z",
+}
+GOOD_CATALOG = {"generatedAt": None, "sources": {}, "items": [GOOD_ITEM]}
+GOOD_STATE = {"lastPull": None, "lastPrune": None, "tombstones": {"z": "2026-10-01T00:00:00Z"}}
+BAD_CATALOGS = {
+    "empty object": {},
+    "array": [],
+    "items not a list": {"sources": {}, "items": {}},
+    "sources not a dict": {"sources": [], "items": []},
+    "item missing firstSeenAt": {"sources": {}, "items": [{**GOOD_ITEM, "firstSeenAt": None}]},
+    "item missing publishedAt": {
+        "sources": {}, "items": [{k: v for k, v in GOOD_ITEM.items() if k != "publishedAt"}]},
+    "item bad publishedAt": {"sources": {}, "items": [{**GOOD_ITEM, "publishedAt": "yesterday"}]},
+    "source status not a dict": {"sources": {"s": "bad"}, "items": []},
+    "source bad lastOk": {"sources": {"s": {"lastOk": "never"}}, "items": []},
+}
+BAD_STATES = {
+    "empty object": {},
+    "array": [],
+    "tombstones not a dict": {"tombstones": []},
+    "bad tombstone timestamp": {"tombstones": {"z": "soon"}},
+    "null tombstone timestamp": {"tombstones": {"z": None}},
+    "bad lastPull": {"lastPull": 5, "tombstones": {}},
+}
+
+
+def write_files(tmp_path, catalog, state):
+    for name, content in (("items.json", catalog), ("state.json", state)):
+        (tmp_path / name).write_text(json.dumps(content))
+    return {name: (tmp_path / name).read_bytes() for name in ("items.json", "state.json")}
+
+
+@pytest.mark.parametrize("operation", ["pull", "prune"])
+@pytest.mark.parametrize("label", BAD_CATALOGS)
+def test_a_misshapen_items_file_is_refused_and_both_files_stay_untouched(
+    tmp_path, label, operation
+):
+    before = write_files(tmp_path, BAD_CATALOGS[label], GOOD_STATE)
+    with pytest.raises(StoreError, match="items.json"):
+        run(tmp_path) if operation == "pull" else run_prune(tmp_path, NOW)
+    assert {n: (tmp_path / n).read_bytes() for n in before} == before
+
+
+@pytest.mark.parametrize("operation", ["pull", "prune"])
+@pytest.mark.parametrize("label", BAD_STATES)
+def test_a_misshapen_state_file_is_refused_and_both_files_stay_untouched(
+    tmp_path, label, operation
+):
+    before = write_files(tmp_path, GOOD_CATALOG, BAD_STATES[label])
+    with pytest.raises(StoreError, match="state.json"):
+        run(tmp_path) if operation == "pull" else run_prune(tmp_path, NOW)
+    assert {n: (tmp_path / n).read_bytes() for n in before} == before
+
+
+def test_unknown_fields_survive_a_pull_and_a_prune(tmp_path):
+    catalog = {**GOOD_CATALOG, "futureCatalogKey": [1],
+               "items": [{**GOOD_ITEM, "futureField": "kept"}]}
+    state = {**GOOD_STATE, "futureStateKey": {"n": 1}}
+    write_files(tmp_path, catalog, state)
+    run(tmp_path)
+    run_prune(tmp_path, NOW)
+    saved_catalog = read_json(tmp_path / "items.json", {})
+    saved_state = read_json(tmp_path / "state.json", {})
+    assert saved_catalog["futureCatalogKey"] == [1]
+    assert next(e for e in saved_catalog["items"] if e["id"] == "a")["futureField"] == "kept"
+    assert saved_state["futureStateKey"] == {"n": 1}
+    assert saved_state["tombstones"]["z"] == "2026-10-01T00:00:00Z"
+
+
+def test_a_valid_catalog_and_state_round_trip_through_prune_unchanged(tmp_path):
+    write_files(tmp_path, GOOD_CATALOG, GOOD_STATE)
+    assert run_prune(tmp_path, NOW) == 0
+    assert read_json(tmp_path / "items.json", {}) == GOOD_CATALOG
+    expected_state = {**GOOD_STATE, "lastPrune": "2026-10-05T12:00:00Z"}
+    assert read_json(tmp_path / "state.json", {}) == expected_state

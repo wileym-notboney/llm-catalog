@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- items.json and state.json are shape-checked on read: a valid-JSON file with the wrong dashboard shape is refused with a StoreError naming the file (CLI exits 2, scheduler backs off) before anything is written; unknown fields are preserved.
 - Added a proposed incremental hardening plan, deferred optimization backlog, and Sonnet/Opus implementation and review handoff.
 - Project scaffolding, design spec, implementation plan and normalized item helpers.
 - RSS and Atom parsers with a DTD guard and http(s)-only links.

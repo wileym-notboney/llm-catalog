@@ -48,7 +48,7 @@ def test_step_pulls_when_due_and_waits_a_tick(tmp_path):
 
 
 def test_step_skips_when_not_due(tmp_path):
-    write_json(tmp_path / "state.json", {"lastPull": "2026-10-05T06:00:30Z"})
+    write_json(tmp_path / "state.json", {"lastPull": "2026-10-05T06:00:30Z", "tombstones": {}})
     calls = []
     assert step(tmp_path, at(5, 7), SLOT, lambda d, n: calls.append(n)) == TICK_SECONDS
     assert calls == []
@@ -59,3 +59,12 @@ def test_a_crashing_pull_backs_off_an_hour_instead_of_retrying_every_minute(tmp_
         raise RuntimeError("disk full after a paid scrape")
 
     assert step(tmp_path, at(5, 7), SLOT, crash) == BACKOFF_SECONDS
+
+
+def test_a_misshapen_state_file_backs_off_before_any_pull_and_is_not_overwritten(tmp_path):
+    original = '{"lastPull": "2026-10-04T06:00:30Z"}'  # valid JSON, no tombstones, pull is due
+    (tmp_path / "state.json").write_text(original)
+    calls = []
+    wait = step(tmp_path, at(5, 12), time(6, 0), lambda *a: calls.append(a))
+    assert wait == BACKOFF_SECONDS and not calls
+    assert (tmp_path / "state.json").read_text() == original
