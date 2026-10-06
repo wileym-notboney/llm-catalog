@@ -1,10 +1,26 @@
 # LLM Feed Dashboard — Reliability Hardening and Optimization Backlog
 
-Date: 2026-10-05 · Status: proposed · Owner approval required before implementation
+Date: 2026-10-05 · Status: H1-H6 complete and approved through G1-G4; H7 (docs) ready for review; H8 open
+
+**Completed:** H1 (shape validators), H2 (byte caps, malformed-payload containment), H3
+(durable paid-attempt accounting), H4 (writer-lock decision, G2), H5 (single-writer flock plus
+empty-catalog/state factory fix, G3), H6 (live paid acceptance, G4). Each was reviewed and
+approved by a separate Opus context through gates G1-G4.
+
+**H6 evidence (2026-10-06T04:02:30Z):** one isolated pull into a tmp directory outside the
+repo, using the owner's 1Password key via `op read` straight into the process environment
+(never written to a file). Exactly 2 credits, one per paid source; `attempts.json` holds two
+records, both stamped `2026-10-06T04:02:30Z`. 5 of 6 sources ok; 36 items, 1388 tombstones,
+`state.json` 100,038 bytes. All three JSON files pass H1's validators. Secret scans clean
+(live key `grep -F`'d against every file, plus pattern scan). The sixth source,
+hermes-agent-releases, parsed 0 items because every current entry is a prerelease removed
+by `SKIP_PRERELEASE`; fetch and parser are fine. That is H8, not a parser defect.
+
+**Deferred:** the optimization backlog below; H8 is a small P2 fix, not a release blocker.
 
 ## Why this exists
 
-The initial dashboard implementation passes 51 offline tests, but adversarial review
+The initial dashboard implementation passed 51 offline tests (130 after hardening), but adversarial review
 identified four gaps that make its operational guarantees weaker than its design:
 
 1. a process death after a paid scrape can cause another paid scrape on restart;
@@ -219,6 +235,40 @@ from deferred optimization.
   command/result when a writer is already active.
 - [ ] Design success criteria and known risks reflect verified, not assumed, live status.
 - [ ] The full suite passes and release notes identify the hardening increment.
+
+### H8 — Distinguish "all entries filtered" from "fetch or parse failed"
+
+**Priority:** P2 · **Blocked by:** none · **Suitable model:** inexpensive · fully offline,
+no paid call
+
+**Outcome:** A source whose entries were all legitimately filtered reports
+success-with-zero-items instead of a failure, while a genuine fetch/parse breakage still
+fails loudly.
+
+**Design:** The meaningful distinction is not "0 items vs more than 0" but: entries parsed
+> 0 and kept after filtering == 0 means fetch and parser both worked and the source
+legitimately has nothing publishable, so set `lastOk=iso(now)`, `lastError=None`, plus a
+short note field saying why (for example "10 entries, all prereleases"). Entries parsed ==
+0 stays the unchanged `FetchError("parsed 0 items")`. Under this split a real parser
+breakage still fails loudly on every source, so the project's top risk loses no visibility.
+Implementation hint: make the pre-filter entry count visible to `_pull_locked`, likely by
+moving the `SKIP_PRERELEASE` application out of `parse_atom` into `collect` so it sees both
+counts; do not parse twice. The validators already preserve unknown fields and
+`staleSources` reads only `lastError`, so the false stale banner disappears with no UI
+change.
+
+**Acceptance criteria:**
+
+- [ ] A fixture is captured from `https://github.com/NousResearch/hermes-agent/releases.atom`
+  (a free feed, 0 credits, fetchable with plain urllib), sanitized, and committed to
+  `tests/fixtures.py` alongside the existing ones. It must assert a filtered-but-successful
+  status and that the source contributes no items. The 2026-10-06 window had 10 entries,
+  all prereleases: 4 canary, 2 `rc.N`, 2 `abandoned-rc.N`, 2 canary. If the live feed has
+  moved on, reproduce that shape. A copy may still exist at the session scratchpad path
+  (`/private/tmp/claude-501/-Users-skeletor-projects-llm-catalog/7aaf4749-b59b-40e7-85ac-b8e209790e74/scratchpad/h8-fixture-source.atom`),
+  but H8 must not depend on it; re-fetching costs nothing.
+- [ ] A zero-entry or garbage feed still fails.
+- [ ] `SKIP_PRERELEASE` itself is unchanged.
 
 ## Dependency map and Agile cadence
 

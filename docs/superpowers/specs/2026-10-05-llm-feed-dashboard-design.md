@@ -1,6 +1,6 @@
 # LLM Feed Dashboard — Design
 
-Date: 2026-10-05 · Status: draft, awaiting review
+Date: 2026-10-05 · Status: reviewed and implemented; hardened (H1-H6 approved, live-verified 2026-10-06); H7 docs in review, H8 open
 
 ## Purpose
 
@@ -11,11 +11,19 @@ Hermes theme. It updates itself daily at near-zero cost.
 **Success criteria (verifiable):**
 
 1. After the daily scheduled pull runs, new items from all four free feeds and both scraped
-   pages appear on the page with no rebuild or republish.
-2. A normal day costs at most 2 Firecrawl credits and 0 Claude tokens.
+   pages appear on the page with no rebuild or republish. _Verified live 2026-10-06: 5 of 6
+   sources ok. hermes-agent-releases produced no publishable items because its entire
+   current release window is prereleases removed by `SKIP_PRERELEASE`, not because of a
+   fetch or parse failure (see Known risks)._
+2. A normal day costs at most 2 Firecrawl credits and 0 Claude tokens. _Verified live
+   2026-10-06: exactly 2 credits, one per paid source, and enforced by the per-UTC-day
+   attempt cap (`data/attempts.json`), not only by call-site discipline._
 3. A failing source never empties or breaks the feed; it shows a "stale" marker.
-4. `pytest` passes: feed-to-item mapping, de-dupe, and prune (including the
-   per-lab floor and tombstones).
+4. `pytest` passes (130 tests, offline): feed-to-item mapping, de-dupe, prune (including the
+   per-lab floor and tombstones), state-file validators, HTTP byte caps, paid-attempt
+   accounting and the writer lock.
+5. One active writer per data directory: a second `pull`/`prune` fetches and writes nothing.
+6. At most one paid attempt per source per UTC day, across crash, restart and manual pull.
 
 ## Sources
 
@@ -125,9 +133,18 @@ is drawn inline; the PNG textures (the marble alone is 2.6 MB) are excluded.
   `/news` list is not strictly date-ordered, so items are sorted by parsed date.
   If the page layout changes and parsing breaks, the fallback is Firecrawl
   JSON-extract (+4 credits each, ~300 credits/month, still inside the free plan).
-- The Firecrawl REST endpoint and request shape must be checked against current
-  docs at plan time. This spec does not assume a version.
-- `maxAge: 0` credit cost is unverified.
+  Both parsers were exercised against live pages on 2026-10-06 and matched their
+  fixtures (anthropic-news 3 dated items, nous-blog 5 undated); the JSON-extract
+  fallback remains unused. The layout can still drift.
+- Verified live 2026-10-06: the `api.firecrawl.dev/v2/scrape` endpoint, the current request
+  shape and the `{"success": true, "data": {"markdown": ...}}` envelope. `maxAge: 0`
+  costs 1 credit per scrape.
+- `summary` is legitimately empty for Anthropic newsroom list rows; only hero cards carry
+  prose. This is not a parser defect: the live split matches `tests/fixtures.py`.
+- A source whose entries are all legitimately filtered is reported as `parsed 0 items` and
+  shows a permanent, misleading stale banner ("Showing the last good items for these"
+  when there are none). hermes-agent-releases is in this state today (all ten current
+  entries are prereleases). Tracked by H8.
 
 ## Out of scope
 

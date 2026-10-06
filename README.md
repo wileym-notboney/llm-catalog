@@ -17,15 +17,39 @@ FIRECRAWL_API_KEY=fc-... python3 serve.py     # also scrapes Anthropic news + No
 Open <http://127.0.0.1:8787>. On start it pulls immediately if the last pull is
 over 24 hours old, then once a day at `PULL_AT`.
 
-| Setting             | Default              | Meaning                                                                                                                             |
-| ------------------- | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| `FIRECRAWL_API_KEY` | unset                | Enables the two scraped sources (1 credit each per pull, about 60 credits a month). Without it they show as stale. Never commit it. |
-| `PULL_AT`           | `06:00`              | Daily pull time, `HH:MM` in UTC                                                                                                     |
-| `DATA_DIR`          | `./data`             | Where `items.json` and `state.json` live                                                                                            |
-| `--host` / `--port` | `127.0.0.1` / `8787` | Bind address. Bind to `0.0.0.0` only on a network you trust: there is no auth.                                                      |
+| Setting             | Default              | Meaning                                                                                                                                   |
+| ------------------- | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `FIRECRAWL_API_KEY` | unset                | Enables the two scraped sources (1 credit each per pull, about 60 credits a month). Without it they show as stale. Never commit it.       |
+| `PULL_AT`           | `06:00`              | Daily pull time, `HH:MM` in UTC                                                                                                           |
+| `DATA_DIR`          | `./data`             | Where `items.json`, `state.json`, `attempts.json` and `.writer.lock` live. Must be a local filesystem: NFS, SMB and sshfs are unsupported |
+| `--host` / `--port` | `127.0.0.1` / `8787` | Bind address. Bind to `0.0.0.0` only on a network you trust: there is no auth.                                                            |
 
 By hand: `python3 -m feed pull` (fetch, merge, prune) and `python3 -m feed prune`
 (prune only, no network).
+
+## Paid attempts, contention and bad state
+
+- **One paid attempt per source per UTC day.** Each Firecrawl source (Anthropic news, Nous
+  blog) gets at most one request per UTC day. The attempt is recorded in
+  `data/attempts.json` _before_ the request and counts whether it succeeds, fails or the
+  process dies, so a crash, restart or manual pull cannot spend a second credit. A second
+  pull the same day defers only that source (shown stale, old items kept) while the free
+  feeds still refresh. The next UTC day allows a new attempt.
+- **One writer per data directory.** `pull` and `prune` take a lock on
+  `DATA_DIR/.writer.lock`. If the server's scheduler or another command already holds it,
+  the CLI prints `another writer owns <dir>; nothing was fetched or written` and exits 3;
+  the scheduler logs a warning and keeps its one-minute tick without touching `lastPull`.
+  The kernel frees the lock when its holder dies, so there is never a stale lock to clear.
+- **Corrupt or misshapen state.** A bad `items.json`, `state.json` or `attempts.json` is
+  refused with an error naming the file and exit 2. Nothing is overwritten; fix or remove
+  the file yourself.
+
+| Exit code | Meaning                                |
+| --------- | -------------------------------------- |
+| 0         | ok (some sources may be stale)         |
+| 1         | every source failed                    |
+| 2         | a state file is corrupt or misshapen   |
+| 3         | another writer owns the data directory |
 
 ## What it keeps
 
