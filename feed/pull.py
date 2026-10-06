@@ -7,7 +7,7 @@ import os
 import urllib.error
 import urllib.request
 import xml.etree.ElementTree as ET
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 from typing import Callable
 
@@ -20,7 +20,16 @@ from feed.scrape_pages import (
     parse_nous_blog,
     read_capped,
 )
-from feed.store import merge, prune, read_json, validate_catalog, validate_state, write_json
+from feed.store import (
+    merge,
+    prune,
+    prune_attempts,
+    read_json,
+    validate_attempts,
+    validate_catalog,
+    validate_state,
+    write_json,
+)
 from feed.xml_feeds import parse_atom, parse_rss
 
 log = logging.getLogger("feed")
@@ -81,15 +90,53 @@ def collect(source: dict, fetch_xml: FetchText, fetch_md: FetchMarkdown | None) 
     return parse_atom(xml_text, skip_title=SKIP_PRERELEASE, **labels)
 
 
+def read_attempts(data_dir: Path) -> dict:
+    """Paid-attempt records. An unreadable file raises StoreError: guessing "none" could double-charge."""
+    return read_json(data_dir / "attempts.json", {"attempts": {}}, validate_attempts)
+
+
+def attempted_today(attempts: dict, source_id: str, now: datetime) -> bool:
+    record = attempts["attempts"].get(source_id)
+    if record is None:
+        return False
+    day = date.fromisoformat(record["date"])
+    if day > now.date():
+        log.warning("source %s has an attempt record dated %s, in the future; fix or remove "
+                    "it in attempts.json or the source stays deferred", source_id, day)
+    return day >= now.date()
+
+
+def save_pruned_attempts(data_dir: Path, attempts: dict, now: datetime) -> None:
+    """Write attempts.json without yesterday's records, but only if something changed."""
+    pruned = prune_attempts(attempts, now)
+    if pruned != attempts:
+        write_json(data_dir / "attempts.json", pruned)
+
+
 def run_pull(
     data_dir: Path, now: datetime, fetch_xml: FetchText, fetch_md: FetchMarkdown | None
 ) -> dict:
-    """Pull every source once. Returns {"ok": [source ids], "failed": {source id: reason}}."""
+    """Pull every source once.
+
+    Returns {"ok": [ids], "failed": {id: reason}, "deferred": [ids]}. A paid source gets at most
+    one request per UTC day: the attempt is saved to attempts.json BEFORE the request and counts
+    whether the request succeeds, fails or the process dies. Deferred sources are not failures.
+    """
     catalog = read_json(data_dir / "items.json", dict(EMPTY_CATALOG), validate_catalog)
     state = read_json(data_dir / "state.json", dict(EMPTY_STATE), validate_state)
-    incoming, ok, failed = [], [], {}
+    attempts = read_attempts(data_dir)
+    incoming, ok, failed, deferred = [], [], {}, []
     for source in SOURCES:
         status = catalog["sources"].setdefault(source["id"], {"lastOk": None, "lastError": None})
+        if source["via"] == "firecrawl" and fetch_md is not None:
+            if attempted_today(attempts, source["id"], now):
+                # lastError is what the UI reads as "stale"; the prefix says why.
+                status["lastError"] = "deferred: paid source already requested today (UTC)"
+                deferred.append(source["id"])
+                log.info("source %s deferred until the next UTC day", source["id"])
+                continue
+            attempts["attempts"][source["id"]] = {"date": now.date().isoformat(), "at": iso(now)}
+            write_json(data_dir / "attempts.json", attempts)
         try:
             found = collect(source, fetch_xml, fetch_md)
             if not found:
@@ -112,16 +159,19 @@ def run_pull(
     catalog.update(generatedAt=iso(now), items=items)
     write_json(data_dir / "items.json", catalog)
     write_json(data_dir / "state.json", state)
-    return {"ok": ok, "failed": failed}
+    save_pruned_attempts(data_dir, attempts, now)
+    return {"ok": ok, "failed": failed, "deferred": deferred}
 
 
 def run_prune(data_dir: Path, now: datetime) -> int:
     """Prune stored data without fetching anything. Returns how many items were dropped."""
     catalog = read_json(data_dir / "items.json", dict(EMPTY_CATALOG), validate_catalog)
     state = read_json(data_dir / "state.json", dict(EMPTY_STATE), validate_state)
+    attempts = read_attempts(data_dir)
     before = len(catalog["items"])
     catalog["items"], state["tombstones"] = prune(catalog["items"], state["tombstones"], now)
     state["lastPrune"] = iso(now)
     write_json(data_dir / "items.json", catalog)
     write_json(data_dir / "state.json", state)
+    save_pruned_attempts(data_dir, attempts, now)
     return before - len(catalog["items"])

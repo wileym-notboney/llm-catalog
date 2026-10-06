@@ -17,6 +17,7 @@ def base_url(tmp_path):
     (dist / "index.html").write_text("<html>dashboard</html>")
     (data / "items.json").write_text('{"items": []}')
     (data / "state.json").write_text('{"tombstones": {}}')
+    (data / "attempts.json").write_text('{"attempts": {}}')
     server = make_server(dist, data, "127.0.0.1", 0)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     yield f"http://127.0.0.1:{server.server_address[1]}"
@@ -40,8 +41,9 @@ def test_serves_items_json_from_the_data_directory_without_caching(base_url):
     assert headers["Cache-Control"] == "no-cache"
 
 
-def test_does_not_expose_state_json_or_traversal(base_url):
-    for path in ("/state.json", "/../data/state.json", "/data/state.json"):
+def test_does_not_expose_private_files_or_traversal(base_url):
+    for path in ("/state.json", "/../data/state.json", "/data/state.json",
+                 "/attempts.json", "/../data/attempts.json", "/data/attempts.json"):
         with pytest.raises(urllib.error.HTTPError) as caught:
             get(base_url + path)
         assert caught.value.code == 404
