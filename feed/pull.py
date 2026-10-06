@@ -13,7 +13,7 @@ from typing import Callable
 
 from feed.items import iso
 from feed.scrape_pages import FetchError, firecrawl_markdown, parse_anthropic_news, parse_nous_blog
-from feed.store import merge, prune, read_json, write_json
+from feed.store import merge, prune, read_json, validate_catalog, validate_state, write_json
 from feed.xml_feeds import parse_atom, parse_rss
 
 log = logging.getLogger("feed")
@@ -78,8 +78,8 @@ def run_pull(
     data_dir: Path, now: datetime, fetch_xml: FetchText, fetch_md: FetchMarkdown | None
 ) -> dict:
     """Pull every source once. Returns {"ok": [source ids], "failed": {source id: reason}}."""
-    catalog = read_json(data_dir / "items.json", dict(EMPTY_CATALOG))
-    state = read_json(data_dir / "state.json", dict(EMPTY_STATE))
+    catalog = read_json(data_dir / "items.json", dict(EMPTY_CATALOG), validate_catalog)
+    state = read_json(data_dir / "state.json", dict(EMPTY_STATE), validate_state)
     incoming, ok, failed = [], [], {}
     for source in SOURCES:
         status = catalog["sources"].setdefault(source["id"], {"lastOk": None, "lastError": None})
@@ -110,8 +110,8 @@ def run_pull(
 
 def run_prune(data_dir: Path, now: datetime) -> int:
     """Prune stored data without fetching anything. Returns how many items were dropped."""
-    catalog = read_json(data_dir / "items.json", dict(EMPTY_CATALOG))
-    state = read_json(data_dir / "state.json", dict(EMPTY_STATE))
+    catalog = read_json(data_dir / "items.json", dict(EMPTY_CATALOG), validate_catalog)
+    state = read_json(data_dir / "state.json", dict(EMPTY_STATE), validate_state)
     before = len(catalog["items"])
     catalog["items"], state["tombstones"] = prune(catalog["items"], state["tombstones"], now)
     state["lastPrune"] = iso(now)

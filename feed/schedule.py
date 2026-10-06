@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Callable
 
 from feed.items import parse_iso
-from feed.store import read_json
+from feed.store import read_json, validate_state
 
 log = logging.getLogger("feed")
 
@@ -40,7 +40,7 @@ def step(
     every minute and burn credits.
     """
     try:
-        state = read_json(data_dir / "state.json", {})
+        state = read_json(data_dir / "state.json", {}, validate_state)
         last = parse_iso(state["lastPull"]) if state.get("lastPull") else None
         if pull_due(last, now, pull_at):
             summary = pull(data_dir, now)
