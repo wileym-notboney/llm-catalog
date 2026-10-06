@@ -1,0 +1,94 @@
+# LLM Feed Dashboard
+
+One merged, chronological feed of news and changelogs from Anthropic, OpenAI and
+Nous Research, in the Mythological Punk theme. One stdlib-only Python process serves
+the page and refreshes the data itself every day. No Docker, no cron, no Node at
+runtime.
+
+## Run
+
+Needs Python 3.10+ and nothing else.
+
+```sh
+python3 serve.py                              # four free feeds only
+FIRECRAWL_API_KEY=fc-... python3 serve.py     # also scrapes Anthropic news + Nous blog
+```
+
+Open <http://127.0.0.1:8787>. On start it pulls immediately if the last pull is
+over 24 hours old, then once a day at `PULL_AT`.
+
+| Setting             | Default              | Meaning                                                                                                                             |
+| ------------------- | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `FIRECRAWL_API_KEY` | unset                | Enables the two scraped sources (1 credit each per pull, about 60 credits a month). Without it they show as stale. Never commit it. |
+| `PULL_AT`           | `06:00`              | Daily pull time, `HH:MM` in UTC                                                                                                     |
+| `DATA_DIR`          | `./data`             | Where `items.json` and `state.json` live                                                                                            |
+| `--host` / `--port` | `127.0.0.1` / `8787` | Bind address. Bind to `0.0.0.0` only on a network you trust: there is no auth.                                                      |
+
+By hand: `python3 -m feed pull` (fetch, merge, prune) and `python3 -m feed prune`
+(prune only, no network).
+
+## What it keeps
+
+- Items older than **10 days** are pruned daily, except the 3 newest per lab.
+- Pruned ids are remembered for 90 days (`data/state.json`) so a source that still
+  lists them cannot bring them back.
+- A source that fails keeps its last good items and shows a "stale" banner.
+- Nous's blog has no dates, so its posts show "first seen" and age out 10 days after
+  they first appear. The first run therefore shows its current featured posts as new.
+
+## Keep it running
+
+`serve.py` does not daemonize. Supervise it with the host's tool.
+
+macOS, `~/Library/LaunchAgents/com.llm-feed.plist` (mode 600 if it holds the key),
+then `launchctl load ~/Library/LaunchAgents/com.llm-feed.plist`:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.llm-feed</string>
+  <key>ProgramArguments</key><array>
+    <string>/usr/bin/python3</string><string>/path/to/llm-catalog/serve.py</string>
+  </array>
+  <key>WorkingDirectory</key><string>/path/to/llm-catalog</string>
+  <key>EnvironmentVariables</key><dict>
+    <key>FIRECRAWL_API_KEY</key><string>fc-...</string>
+  </dict>
+  <key>RunAtLoad</key><true/><key>KeepAlive</key><true/>
+</dict></plist>
+```
+
+Linux, `/etc/systemd/system/llm-feed.service` with `/etc/llm-feed.env` (mode 600)
+holding `FIRECRAWL_API_KEY=fc-...`:
+
+```ini
+[Unit]
+Description=LLM feed dashboard
+After=network-online.target
+
+[Service]
+WorkingDirectory=/path/to/llm-catalog
+EnvironmentFile=/etc/llm-feed.env
+ExecStart=/usr/bin/python3 /path/to/llm-catalog/serve.py
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+```
+
+## Develop
+
+```sh
+python3 -m venv .venv && .venv/bin/pip install pytest
+.venv/bin/python -m pytest
+```
+
+The UI source is in `app/` (React + Vite + Tailwind). `app/dist/index.html` is the
+committed build, so a fresh clone runs without Node. After changing the UI:
+
+```sh
+cd app && pnpm install && pnpm run bundle   # rewrites app/dist/index.html
+```
+
+Theme tokens come from `~/.hermes/desktop-plugins/mythological-punk/mythological-punk.yaml`
+and live in `app/src/theme.css`. Dark only, system fonts, no external assets.
