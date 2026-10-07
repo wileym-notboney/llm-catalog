@@ -1,4 +1,4 @@
-# ABOUTME: Tests for one full pull across all six sources, using injected fakes (no network).
+# ABOUTME: Tests for one full pull across all five sources, using injected fakes (no network).
 # ABOUTME: Covers stale handling, empty-parse protection, tombstones and prune-failure safety.
 import json
 from datetime import datetime, timedelta, timezone
@@ -20,14 +20,13 @@ FRESH = "2026-10-05T07:00:00Z"
 def feeds(**overrides):
     base = {
         "anthropic-api-notes": rss(("API notes", "https://platform.claude.com/n#1", RECENT)),
-        "claude-code-releases": atom(("v2.1.290", "https://github.com/c/v2.1.290", FRESH)),
-        "openai-news": rss(("OpenAI post", "https://openai.com/index/p", RECENT)),
-        "hermes-agent-releases": atom(
-            ("v0.21.4+canary.1", "https://github.com/h/canary", FRESH),
-            ("rc.35-v0.21.5", "https://github.com/h/rc35", FRESH),
-            ("abandoned-rc.34-v0.21.5", "https://github.com/h/abandoned", FRESH),
-            ("v0.21.3", "https://github.com/h/v0.21.3", FRESH),
+        "claude-code-releases": atom(
+            ("v2.1.290", "https://github.com/c/v2.1.290", FRESH),
+            ("v2.1.291+canary.1", "https://github.com/c/canary", FRESH),
+            ("rc.35-v2.1.292", "https://github.com/c/rc35", FRESH),
+            ("abandoned-rc.34-v2.1.292", "https://github.com/c/abandoned", FRESH),
         ),
+        "openai-news": rss(("OpenAI post", "https://openai.com/index/p", RECENT)),
     }
     base.update(overrides)
     by_url = {URLS[key]: value for key, value in base.items()}
@@ -60,11 +59,11 @@ def urls(tmp_path):
 
 def test_a_clean_pull_ingests_every_source_and_hides_canaries(tmp_path):
     summary = run(tmp_path)
-    assert summary["failed"] == {} and len(summary["ok"]) == 6
+    assert summary["failed"] == {} and len(summary["ok"]) == 5
     found = urls(tmp_path)
-    assert "https://github.com/h/v0.21.3" in found
-    assert not found & {"https://github.com/h/canary", "https://github.com/h/rc35",
-                        "https://github.com/h/abandoned"}
+    assert "https://github.com/c/v2.1.290" in found
+    assert not found & {"https://github.com/c/canary", "https://github.com/c/rc35",
+                        "https://github.com/c/abandoned"}
     assert "https://nousresearch.com/lighthouse-attention" in found
     catalog = read_json(tmp_path / "items.json", {})
     assert catalog["sources"]["openai-news"] == {"lastOk": "2026-10-05T12:00:00Z", "lastError": None}
@@ -82,7 +81,7 @@ def test_a_failing_source_keeps_its_old_items_and_is_marked_stale(tmp_path):
 
 def test_malformed_xml_is_a_stale_source_not_a_crash(tmp_path):
     summary = run(tmp_path, feeds(**{"openai-news": "<rss><channel>"}))
-    assert "openai-news" in summary["failed"] and len(summary["ok"]) == 5
+    assert "openai-news" in summary["failed"] and len(summary["ok"]) == 4
 
 
 def test_a_layout_change_that_parses_zero_items_is_stale_and_keeps_old_items(tmp_path):
@@ -97,7 +96,7 @@ def test_without_a_firecrawl_key_only_the_two_scraped_sources_go_stale(tmp_path)
     summary = run(tmp_path, fetch_md=None)
     assert set(summary["failed"]) == {"anthropic-news", "nous-blog"}
     assert summary["failed"]["nous-blog"] == "FIRECRAWL_API_KEY not set"
-    assert len(summary["ok"]) == 4
+    assert len(summary["ok"]) == 3
 
 
 def test_pruned_items_are_not_reingested_by_the_next_pull(tmp_path):
@@ -228,7 +227,7 @@ def test_invalid_utf8_from_one_feed_stales_only_that_source(tmp_path):
 
     result = run(tmp_path, fetch_xml=fetch_xml)
     assert list(result["failed"]) == ["openai-news"]
-    assert len(result["ok"]) == 5
+    assert len(result["ok"]) == 4
     assert "https://openai.com/index/p" not in urls(tmp_path)
     assert "https://platform.claude.com/n#1" in urls(tmp_path)
 

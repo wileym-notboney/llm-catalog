@@ -61,7 +61,8 @@ def test_parse_atom_filters_canary_releases():
         ("v0.21.3", "https://g/s", "2026-10-01T07:19:01Z"),
     )
     items = parse_atom(
-        xml, lab="nous", kind="release", source="hermes-agent-releases", skip_title=r"canary|nightly"
+        xml, lab="anthropic", kind="release", source="claude-code-releases",
+        skip_title=r"canary|nightly"
     )
     assert [item["title"] for item in items] == ["v0.21.3"]
 

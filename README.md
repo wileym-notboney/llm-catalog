@@ -10,7 +10,7 @@ runtime.
 Needs Python 3.10+ and nothing else.
 
 ```sh
-python3 serve.py                              # four free feeds only
+python3 serve.py                              # three free feeds only
 FIRECRAWL_API_KEY=fc-... python3 serve.py     # also scrapes Anthropic news + Nous blog
 ```
 

@@ -31,7 +31,7 @@ platform limits.
 
 Traced in the code, not assumed:
 
-- `feed/pull.py:run_pull` reads `items.json` and `state.json`, fetches six sources, merges,
+- `feed/pull.py:run_pull` reads `items.json` and `state.json`, fetches five sources, merges,
   prunes, then writes both files through `feed/store.py:write_json` (temp file +
   `os.replace`).
 - `feed/pull.py:run_prune` reads and writes the same two files, offline.

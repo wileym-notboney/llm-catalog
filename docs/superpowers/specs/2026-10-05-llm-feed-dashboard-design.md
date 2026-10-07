@@ -10,11 +10,11 @@ Hermes theme. It updates itself daily at near-zero cost.
 
 **Success criteria (verifiable):**
 
-1. After the daily scheduled pull runs, new items from all four free feeds and both scraped
-   pages appear on the page with no rebuild or republish. _Verified live 2026-10-06: 5 of 6
-   sources ok. hermes-agent-releases produced no publishable items because its entire
-   current release window is prereleases removed by `SKIP_PRERELEASE`, not because of a
-   fetch or parse failure (see Known risks)._
+1. After the daily scheduled pull runs, new items from all three free feeds and both
+   scraped pages appear on the page with no rebuild or republish. _Verified live
+   2026-10-06: every source ok. A sixth source, the hermes-agent release feed, was dropped
+   the same day: its whole release window is pipeline noise, so `SKIP_PRERELEASE` left it
+   with nothing to publish and it reported a permanent false failure._
 2. A normal day costs at most 2 Firecrawl credits and 0 Claude tokens. _Verified live
    2026-10-06: exactly 2 credits, one per paid source, and enforced by the per-UTC-day
    attempt cap (`data/attempts.json`), not only by call-site discipline._
@@ -34,7 +34,6 @@ Hermes theme. It updates itself daily at near-zero cost.
 | Anthropic | github.com/anthropics/claude-code/releases.atom    | Atom via urllib             | 0           |
 | OpenAI    | openai.com/news/rss.xml                            | RSS via urllib              | 0           |
 | Nous      | nousresearch.com/blog                              | Firecrawl scrape (markdown) | 1           |
-| Nous      | github.com/NousResearch/hermes-agent/releases.atom | Atom via urllib             | 0           |
 
 Verified 2026-10-05: scrape = 1 credit (live `creditsUsed: 1`), JSON-extract = +4,
 free plan = 1,000 credits/month. Daily cadence ≈ 60 credits/month.
@@ -50,7 +49,7 @@ free plan = 1,000 credits/month. Daily cadence ≈ 60 credits/month.
   "summary": "plain text, ≤ 280 chars",
   "url": "…",
   "publishedAt": "ISO-8601 or null",
-  "source": "anthropic-news | anthropic-api-notes | claude-code-releases | openai-news | nous-blog | hermes-agent-releases",
+  "source": "anthropic-news | anthropic-api-notes | claude-code-releases | openai-news | nous-blog",
   "firstSeenAt": "ISO-8601"
 }
 ```
@@ -89,7 +88,7 @@ Components, each independently testable:
 
 ## Schedule
 
-- **Daily pull:** fetches all six sources; scrapes use `maxAge: 0` (the default
+- **Daily pull:** fetches all five sources; scrapes use `maxAge: 0` (the default
   cache served pages up to ~1 day old). Runs at `PULL_AT`, or at startup if the
   last pull is over 24h old, so a machine that was off still catches up.
 - **Daily prune (right after the pull, separate step):** drops items older than
@@ -109,7 +108,7 @@ caller (`FIRECRAWL_API_KEY=… python3 serve.py`, or the `EnvironmentFile` / pli
 entry in the README's supervision examples). The repo contains no key and no
 `.env` file; the README documents the variable. The key is never committed, logged, or written
 to `data/`; errors log the HTTP status, not request headers. Without a key, `pull`
-still ingests the four free feeds and marks the two scraped sources stale.
+still ingests the three free feeds and marks the two scraped sources stale.
 
 ## Error handling
 
@@ -142,9 +141,10 @@ is drawn inline; the PNG textures (the marble alone is 2.6 MB) are excluded.
 - `summary` is legitimately empty for Anthropic newsroom list rows; only hero cards carry
   prose. This is not a parser defect: the live split matches `tests/fixtures.py`.
 - A source whose entries are all legitimately filtered is reported as `parsed 0 items` and
-  shows a permanent, misleading stale banner ("Showing the last good items for these"
-  when there are none). hermes-agent-releases is in this state today (all ten current
-  entries are prereleases). Tracked by H8.
+  would show a permanent, misleading stale banner ("Showing the last good items for these"
+  when there are none). No current source is in that state — the one that was, the
+  hermes-agent release feed, was dropped on 2026-10-06. The conflation is still latent for
+  any future Atom source that publishes only prereleases; see the dropped H8 ticket.
 
 ## Out of scope
 
