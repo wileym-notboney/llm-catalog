@@ -17,6 +17,24 @@ FIRECRAWL_API_KEY=fc-... python3 serve.py     # also scrapes Anthropic news + No
 Open <http://127.0.0.1:8787>. On start it pulls immediately if the last pull is
 over 24 hours old, then once a day at `PULL_AT`.
 
+## Pages
+
+| Route      | Page          | Data                                                                 |
+| ---------- | ------------- | -------------------------------------------------------------------- |
+| `#/`       | Feed          | `/items.json`, refreshed by the daily pull                           |
+| `#/models` | Model catalog | `app/src/models.json`, bundled into the page — no network at runtime |
+
+The model catalog lists current models from Anthropic, OpenAI and Ollama (local,
+open-weight) with each one's role, specs, strengths and weaknesses. It is
+hand-curated editorial judgement, not scraped: no provider API returns "what is
+this model bad at". The page shows the `reviewedAt` date so you can see how stale
+it is. To update it, edit `app/src/models.json` and rebuild:
+
+```sh
+.venv/bin/python -m pytest tests/test_models_catalog.py   # validates the shape
+cd app && pnpm run bundle                                  # rewrites app/dist/index.html
+```
+
 | Setting             | Default              | Meaning                                                                                                                                   |
 | ------------------- | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
 | `FIRECRAWL_API_KEY` | unset                | Enables the two scraped sources (1 credit each per pull, about 60 credits a month). Without it they show as stale. Never commit it.       |
