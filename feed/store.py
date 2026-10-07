@@ -10,7 +10,7 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Callable, Iterator
 
-from feed.items import iso, parse_iso
+from feed.items import is_web_url, iso, parse_iso
 
 RETENTION = timedelta(days=10)
 FLOOR_PER_LAB = 3
@@ -77,11 +77,19 @@ def validate_catalog(data: object) -> None:
     for source_id, status in data["sources"].items():
         _check_type(status, dict, f"source {source_id!r}")
         _check_iso(status.get("lastOk"), f"source {source_id!r} lastOk", nullable=True)
+        if status.get("lastError") is not None:
+            _check_type(status["lastError"], str, f"source {source_id!r} lastError")
     for position, entry in enumerate(data["items"]):
         where = f"item #{position}"
         _check_type(entry, dict, where)
-        for key in ("id", "lab"):
+        for key in ("id", "lab", "kind", "title", "summary", "url", "source"):
             _check_type(entry.get(key), str, f"{where} '{key}'")
+        if entry["lab"] not in ("anthropic", "openai", "nous"):
+            raise ValueError(f"{where} has an unknown lab")
+        if entry["kind"] not in ("news", "changelog", "release"):
+            raise ValueError(f"{where} has an unknown kind")
+        if not is_web_url(entry["url"]):
+            raise ValueError(f"{where} url must use http(s)")
         _check_iso(entry.get("firstSeenAt"), f"{where} firstSeenAt")
         if "publishedAt" not in entry:
             raise ValueError(f"{where} is missing 'publishedAt'")

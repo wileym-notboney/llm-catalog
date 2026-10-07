@@ -10,7 +10,7 @@ import {
   formatDay,
   isNew,
   itemDate,
-  markVisit,
+  loadCatalog,
   readLastVisit,
   staleSources,
   timeAgo,
@@ -28,15 +28,9 @@ export default function Feed() {
   const [lastVisit] = useState(readLastVisit);
 
   useEffect(() => {
-    fetch("./items.json", { cache: "no-store" })
-      .then((response) => {
-        if (!response.ok)
-          throw new Error(`items.json returned ${response.status}`);
-        return response.json() as Promise<Catalog>;
-      })
+    loadCatalog()
       .then(setCatalog)
       .catch((reason: Error) => setError(reason.message));
-    markVisit();
   }, []);
 
   const shown = useMemo(
@@ -87,7 +81,7 @@ export default function Feed() {
               <span className="tag">{LAB_NAMES[item.lab]}</span>
               <span className="muted">{item.kind}</span>
               <span className="muted">
-                {formatDay(itemDate(item))}
+                {formatDay(itemDate(item), item.source === "anthropic-news")}
                 {item.publishedAt === null && " (first seen)"}
               </span>
               {isNew(item, lastVisit) && <span className="new">new</span>}

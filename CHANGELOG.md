@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Fixed six review findings: interrupted HTTP responses now stale only their source;
+  paid attempts use the current UTC date at each request, including pulls crossing midnight;
+  retired source statuses are removed on pull while their articles follow normal retention;
+  persisted and browser-loaded catalogs validate display fields and http(s) links;
+  Anthropic date-only publications retain their source calendar day; failed feed loads no
+  longer advance the last-visit timestamp. Added offline backend/frontend regression checks
+  and rebuilt the committed dashboard. No new dependencies or paid retries.
 - Added a second page, the model catalog at `#/models`: current models from Anthropic, OpenAI and
   Ollama (local, open-weight) with each one's role, specs, strengths and weaknesses. The catalog is
   hand-curated editorial content in `app/src/models.json`, bundled into `app/dist/index.html`, so

@@ -128,6 +128,10 @@ python3 -m venv .venv && .venv/bin/pip install pytest
 .venv/bin/python -m pytest
 ```
 
+Frontend regression checks use Node's built-in test runner and the existing TypeScript
+dev dependency: `cd app && pnpm test`. They run offline and cover catalog validation,
+calendar dates, and visit tracking after successful or failed loads.
+
 The UI source is in `app/` (React + Vite + Tailwind). `app/dist/index.html` is the
 committed build, so a fresh clone runs without Node. After changing the UI:
 
