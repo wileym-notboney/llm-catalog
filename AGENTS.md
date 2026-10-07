@@ -66,9 +66,10 @@ module per feed module plus `fixtures.py`. `data/` is runtime state and git-igno
   the parser and its fixture together.
 - GitHub release feeds contain pipeline noise (`canary`, `nightly`, `rc.N`, `abandoned-rc.N`
   with JSON bodies). The filter is `SKIP_PRERELEASE` in `feed/pull.py`.
-  As of 2026-10-06 the entire current hermes-agent release window is prereleases, so that
-  source legitimately yields 0 items and is reported as failed/stale. That is the filter
-  doing its job, not a parser defect; H8 will separate "all filtered" from "parse failed".
+  A feed of nothing but noise yields 0 items and is then reported as failed/stale, which is
+  the filter doing its job rather than a parser defect. The hermes-agent release feed was in
+  exactly that state and was dropped on 2026-10-06; no current source is. See the dropped
+  H8 ticket if a future Atom source hits it.
 - Nous's blog is undated, so its posts show "first seen" and age out 10 days later.
 - The first pull creates ~1,400 tombstones (OpenAI's RSS is long); `state.json` ≈ 100 KB.
 - Never inline the PNG textures from the theme plugin (the marble is 2.6 MB).

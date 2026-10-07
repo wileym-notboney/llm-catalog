@@ -35,8 +35,9 @@ from feed.xml_feeds import parse_atom, parse_rss
 
 log = logging.getLogger("feed")
 
-# Pipeline tags that would flood the feed: hermes-agent publishes a canary daily plus
-# rc.N / abandoned-rc.N tags whose bodies are JSON, not release notes.
+# Pipeline tags that would flood the feed. Applied to every Atom release feed: a repo can
+# publish canary/nightly builds and rc.N / abandoned-rc.N tags whose bodies are JSON, not
+# release notes. A feed of nothing but these legitimately yields no items.
 SKIP_PRERELEASE = r"canary|nightly|abandoned|\brc[.-]?\d"
 
 SOURCES = (
@@ -50,8 +51,6 @@ SOURCES = (
      "url": "https://openai.com/news/rss.xml"},
     {"id": "nous-blog", "via": "firecrawl", "url": "https://nousresearch.com/blog",
      "parse": parse_nous_blog},
-    {"id": "hermes-agent-releases", "via": "atom", "lab": "nous", "kind": "release",
-     "url": "https://github.com/NousResearch/hermes-agent/releases.atom"},
 )
 
 def _empty_catalog() -> dict:
