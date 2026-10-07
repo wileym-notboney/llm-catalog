@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Added a second page, the model catalog at `#/models`: current models from Anthropic, OpenAI and
+  Ollama (local, open-weight) with each one's role, specs, strengths and weaknesses. The catalog is
+  hand-curated editorial content in `app/src/models.json`, bundled into `app/dist/index.html`, so
+  there is no new network call, no API key and no change to `serve.py` or what it serves. Nine tests
+  validate the catalog's shape (required fields, known providers, unique ids, non-empty judgements,
+  https-only docs links, no stray keys). Pages are reached by hash route (`#/` feed, `#/models`
+  catalog) with no router dependency. Suite: 139 tests.
 - Dropped the hermes-agent release feed: its whole release window is pipeline noise, so the
   prerelease filter left it with nothing to publish and it reported a permanent false stale
   marker. Five sources remain (three free feeds, two paid scrapes); the prerelease filter still

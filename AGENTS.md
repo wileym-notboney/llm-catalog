@@ -7,19 +7,22 @@
 
 ## What this is
 
-A self-contained dashboard: one merged, chronological feed of news and changelogs from
-Anthropic, OpenAI and Nous Research, in the Mythological Punk theme. One stdlib-only
-Python process (`serve.py`) serves the committed React build and refreshes the data
-itself daily. No Docker, no host cron, no Proxmox, no Node at runtime.
+A self-contained dashboard with two pages, in the Mythological Punk theme: the feed
+(`#/`), one merged chronological stream of news and changelogs from Anthropic, OpenAI
+and Nous Research, and the model catalog (`#/models`), a hand-curated list of current
+models with strengths and weaknesses. One stdlib-only Python process (`serve.py`) serves
+the committed React build and refreshes the feed itself daily. No Docker, no host cron,
+no Proxmox, no Node at runtime.
 
 Design: `docs/superpowers/specs/2026-10-05-llm-feed-dashboard-design.md`.
+Model catalog page plan: `docs/superpowers/plans/2026-10-06-model-catalog-page.md`.
 Plan (implemented): `docs/superpowers/plans/2026-10-05-llm-feed-dashboard.md`.
 Hardening plan (H1-H6 done, H7 docs, H8 open): `docs/superpowers/plans/2026-10-05-llm-feed-dashboard-hardening.md`.
 
 ## Commands
 
 ```sh
-.venv/bin/python -m pytest              # 130 tests, no network, no credits
+.venv/bin/python -m pytest              # 139 tests, no network, no credits
 python3 serve.py                        # http://127.0.0.1:8787, scheduler included
 python3 -m feed pull                    # fetch, merge, prune by hand (--data DIR)
 python3 -m feed prune                   # prune only, offline
@@ -35,6 +38,10 @@ Dev setup: `python3 -m venv .venv && .venv/bin/pip install pytest`. Python 3.10+
 source and `app/dist/index.html` is its committed single-file build; `tests/` has one
 module per feed module plus `fixtures.py`. `data/` is runtime state and git-ignored.
 
+In `app/src/`: `App.tsx` is the shell (masthead, nav, hash route), `Feed.tsx` and
+`Models.tsx` are the two pages, `Chips.tsx` is the filter row both use, `lib/feed.ts` and
+`lib/models.ts` hold the React-free display rules, and `models.json` is the catalog data.
+
 ## Invariants — do not break these
 
 - Runtime is stdlib only. Ask before adding any runtime dependency (`pytest` is dev only).
@@ -47,6 +54,13 @@ module per feed module plus `fixtures.py`. `data/` is runtime state and git-igno
 - A source that fails, or parses 0 items, goes stale and keeps its old items. Never let it
   empty the feed. A corrupt `items.json` is refused, never treated as empty.
 - Only `app/dist` and `/items.json` are served; `state.json` and `attempts.json` must 404. Bind 127.0.0.1.
+- The model catalog is bundled, not served: `app/src/models.json` is inlined into
+  `app/dist/index.html` at build time. It must stay that way — a new served path would mean a new
+  hole in the rule above. Editing the catalog needs `pnpm run bundle` to take effect, and
+  `tests/test_models_catalog.py` must stay green (https-only docs links, known providers, every
+  model states both strengths and weaknesses).
+- Pages are hash routes (`#/`, `#/models`) handled in `App.tsx`. No router dependency: adding one
+  would need panda master's approval like any other dependency.
 - Only http(s) links reach the page. XML with a DTD/entity is rejected.
 - Per-source status lives only in `items.json`; `state.json` holds `lastPull`, `lastPrune`,
   `tombstones`. One source of truth.

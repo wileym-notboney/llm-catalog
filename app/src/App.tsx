@@ -1,23 +1,14 @@
-// ABOUTME: The LLM feed dashboard page: fetches items.json and shows one merged, filterable feed.
-// ABOUTME: Styled by theme.css (Mythological Punk); all display rules live in lib/feed.ts.
-import { useEffect, useMemo, useState } from "react";
+// ABOUTME: The shell: masthead, crest, nav, and the hash route that picks the feed or the catalog.
+// ABOUTME: Routes are "#/" (feed) and "#/models" (catalog); anything else falls back to the feed.
+import { useEffect, useState } from "react";
 import "./theme.css";
-import {
-  KINDS,
-  LABS,
-  LAB_NAMES,
-  filterItems,
-  formatDay,
-  isNew,
-  itemDate,
-  markVisit,
-  readLastVisit,
-  staleSources,
-  timeAgo,
-  type Catalog,
-  type Kind,
-  type Lab,
-} from "./lib/feed";
+import Feed from "./Feed";
+import Models from "./Models";
+
+const PAGES = [
+  { hash: "#/", label: "Feed" },
+  { hash: "#/models", label: "Models" },
+] as const;
 
 function Crest() {
   return (
@@ -48,55 +39,20 @@ function Crest() {
   );
 }
 
-function Chips<T extends string>(props: {
-  label: string;
-  options: readonly T[];
-  value: T | "all";
-  names?: Record<string, string>;
-  onChange: (value: T | "all") => void;
-}) {
-  return (
-    <div className="chips" role="group" aria-label={props.label}>
-      {(["all", ...props.options] as const).map((option) => (
-        <button
-          key={option}
-          type="button"
-          className="chip"
-          aria-pressed={props.value === option}
-          onClick={() => props.onChange(option)}
-        >
-          {option === "all" ? "All" : (props.names?.[option] ?? option)}
-        </button>
-      ))}
-    </div>
-  );
+/** The hash is the only router: no dependency, and the single static file still answers every link. */
+function useHash(): string {
+  const [hash, setHash] = useState(() => window.location.hash);
+  useEffect(() => {
+    const read = () => setHash(window.location.hash);
+    window.addEventListener("hashchange", read);
+    return () => window.removeEventListener("hashchange", read);
+  }, []);
+  return hash;
 }
 
 export default function App() {
-  const [catalog, setCatalog] = useState<Catalog | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [lab, setLab] = useState<Lab | "all">("all");
-  const [kind, setKind] = useState<Kind | "all">("all");
-  // Read once, before markVisit() overwrites it, so "new" means new since the previous visit.
-  const [lastVisit] = useState(readLastVisit);
-
-  useEffect(() => {
-    fetch("./items.json", { cache: "no-store" })
-      .then((response) => {
-        if (!response.ok)
-          throw new Error(`items.json returned ${response.status}`);
-        return response.json() as Promise<Catalog>;
-      })
-      .then(setCatalog)
-      .catch((reason: Error) => setError(reason.message));
-    markVisit();
-  }, []);
-
-  const shown = useMemo(
-    () => (catalog ? filterItems(catalog.items, lab, kind) : []),
-    [catalog, lab, kind],
-  );
-  const stale = catalog ? staleSources(catalog) : [];
+  const hash = useHash();
+  const onModels = hash === "#/models";
 
   return (
     <main className="page">
@@ -104,63 +60,24 @@ export default function App() {
         <Crest />
         <div>
           <h1>LLM Feed</h1>
-          <p className="muted">
-            Anthropic · OpenAI · Nous Research
-            {catalog?.generatedAt &&
-              ` · updated ${timeAgo(catalog.generatedAt)}`}
-          </p>
+          <nav className="nav" aria-label="Pages">
+            {PAGES.map((page) => (
+              <a
+                key={page.hash}
+                className="chip"
+                href={page.hash}
+                aria-current={
+                  (page.hash === "#/models") === onModels ? "page" : undefined
+                }
+              >
+                {page.label}
+              </a>
+            ))}
+          </nav>
         </div>
       </header>
 
-      {stale.length > 0 && (
-        <p className="banner" role="status">
-          Stale: {stale.join(", ")}. Showing the last good items for these.
-        </p>
-      )}
-
-      <div className="filters">
-        <Chips
-          label="Lab"
-          options={LABS}
-          value={lab}
-          names={LAB_NAMES}
-          onChange={setLab}
-        />
-        <Chips label="Kind" options={KINDS} value={kind} onChange={setKind} />
-      </div>
-
-      {error && (
-        <p className="banner error" role="alert">
-          Could not load the feed ({error}). Run{" "}
-          <code>python3 -m feed pull</code> once.
-        </p>
-      )}
-      {!catalog && !error && <p className="muted">Loading…</p>}
-      {catalog && shown.length === 0 && (
-        <p className="muted">Nothing matches these filters.</p>
-      )}
-
-      <ol className="feed">
-        {shown.map((item) => (
-          <li key={item.id} className={`card lab-${item.lab}`}>
-            <div className="meta">
-              <span className="tag">{LAB_NAMES[item.lab]}</span>
-              <span className="muted">{item.kind}</span>
-              <span className="muted">
-                {formatDay(itemDate(item))}
-                {item.publishedAt === null && " (first seen)"}
-              </span>
-              {isNew(item, lastVisit) && <span className="new">new</span>}
-            </div>
-            <h2>
-              <a href={item.url} target="_blank" rel="noopener noreferrer">
-                {item.title}
-              </a>
-            </h2>
-            {item.summary && <p className="summary">{item.summary}</p>}
-          </li>
-        ))}
-      </ol>
+      {onModels ? <Models /> : <Feed />}
     </main>
   );
 }

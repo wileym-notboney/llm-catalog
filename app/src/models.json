@@ -1,0 +1,261 @@
+{
+  "reviewedAt": "2026-10-06",
+  "models": [
+    {
+      "id": "claude-fable-5-1",
+      "name": "Claude Fable 5.1",
+      "provider": "anthropic",
+      "role": "Demanding reasoning and long-horizon agentic work",
+      "context": "1M tokens, 128K output",
+      "price": "$10 / $50 per MTok",
+      "size": null,
+      "strengths": [
+        "Anthropic's pick when evals on Opus 5.5 at higher effort still fall short",
+        "Adaptive thinking is always on and defaults to high effort, so hard problems get budget without prompting for it",
+        "Holds a plan together across very long agentic runs"
+      ],
+      "weaknesses": [
+        "The most expensive model in the family at 2.5x Opus 5.5 per token, and slower to first output",
+        "Overkill for routine work: Opus 5.5 matches it on most tasks for less",
+        "OpenAI's GPT-6.1 Sol claims comparable results on agentic coding at a fifth of the price, so it is worth benchmarking on your own workload"
+      ],
+      "docs": "https://platform.claude.com/docs/en/models/fable-5-1/overview"
+    },
+    {
+      "id": "claude-opus-5-5",
+      "name": "Claude Opus 5.5",
+      "provider": "anthropic",
+      "role": "Long-running agentic coding and knowledge work",
+      "context": "1M tokens, 128K output",
+      "price": "$4 / $20 per MTok, $0.20 cache reads",
+      "size": null,
+      "strengths": [
+        "The default recommendation for most workloads: Fable-level results on most work at a lower price",
+        "Cache reads at $0.20/MTok make long agentic sessions, where cached context dominates the bill, much cheaper",
+        "Adaptive thinking always on, with effort tunable from low to max"
+      ],
+      "weaknesses": [
+        "Moderate latency: not the one for interactive, token-by-token UX",
+        "Still 2x Sonnet 5.5 per token, and Sonnet 5.5 is close enough on many tasks that the gap has to be measured, not assumed"
+      ],
+      "docs": "https://platform.claude.com/docs/en/models/opus-5-5/overview"
+    },
+    {
+      "id": "claude-sonnet-5-5",
+      "name": "Claude Sonnet 5.5",
+      "provider": "anthropic",
+      "role": "The best combination of speed and intelligence",
+      "context": "1M tokens, 128K output",
+      "price": "$2 / $10 per MTok, $0.20 cache reads",
+      "size": null,
+      "strengths": [
+        "Fast with a 1M context window, which is the combination most product work actually needs",
+        "Defaults to high effort, so quality does not depend on remembering to raise it",
+        "Needs fewer tokens than Sonnet 5 for the same work, so cost per task drops even at identical token prices"
+      ],
+      "weaknesses": [
+        "Thinking is adaptive rather than always on, so the hardest problems need the effort level raised deliberately",
+        "Falls behind Opus 5.5 and Fable 5.1 on the longest agentic runs"
+      ],
+      "docs": "https://platform.claude.com/docs/en/models/sonnet-5-5/overview"
+    },
+    {
+      "id": "claude-haiku-4-5",
+      "name": "Claude Haiku 4.5",
+      "provider": "anthropic",
+      "role": "Fastest model with near-frontier intelligence",
+      "context": "200K tokens, 64K output",
+      "price": "$1 / $5 per MTok",
+      "size": null,
+      "strengths": [
+        "The fastest Claude, and the cheapest, for classification, extraction and high-volume calls",
+        "Near-frontier quality for its tier at a fifth of Opus 5.5's token price"
+      ],
+      "weaknesses": [
+        "Knowledge cutoff of Feb 2025 is well over a year behind the 5.5 family's Jun 2026",
+        "200K context and 64K output, a fifth of the rest of the family",
+        "The oldest model listed here and scheduled for retirement no sooner than Oct 15, 2026; Haiku 5.5 was announced as joining the 5.5 family, so check for it before building on this one"
+      ],
+      "docs": "https://platform.claude.com/docs/en/models/haiku-4-5/overview"
+    },
+    {
+      "id": "gpt-6-astra",
+      "name": "GPT-6 Astra",
+      "provider": "openai",
+      "role": "OpenAI's most capable model for the most demanding work",
+      "context": "1.05M tokens, 128K output",
+      "price": "$10 / $50 per MTok",
+      "size": null,
+      "strengths": [
+        "OpenAI's flagship for complex reasoning and coding, and their strongest computer-use model",
+        "Effort levels run from low all the way to max, so one model covers a wide cost/quality range",
+        "Better than its predecessors at making a sensible call when instructions leave room for interpretation"
+      ],
+      "weaknesses": [
+        "Priced like Fable 5.1 at $10/$50, the most expensive option on this page",
+        "GPT-6.1 Sol reaches near-Astra quality at a fifth of the price, which makes Astra hard to justify outside the hardest work",
+        "Knowledge cutoff Apr 30, 2026"
+      ],
+      "docs": "https://developers.openai.com/api/docs/models/gpt-6-astra"
+    },
+    {
+      "id": "gpt-6-1-sol",
+      "name": "GPT-6.1 Sol",
+      "provider": "openai",
+      "role": "Near-Astra performance for complex work at a lower cost",
+      "context": "1.05M tokens, 128K output",
+      "price": "$2 / $10 per MTok, $0.10 cached input",
+      "size": null,
+      "strengths": [
+        "Nearly matches Astra on agentic coding, computer use and professional work at a fifth of its token price",
+        "Fewer factual errors than GPT-6 Sol and more reliable at respecting explicit restrictions during agentic tasks",
+        "A `pro` reasoning mode is available for hard problems without switching models"
+      ],
+      "weaknesses": [
+        "`pro` mode spends far more reasoning tokens, costing several times a normal request and taking much longer — not for everyday work",
+        "Not available in ChatGPT's Chat surface at launch (Work and Codex only), so behaviour there can differ from the API",
+        "Knowledge cutoff Apr 30, 2026"
+      ],
+      "docs": "https://developers.openai.com/api/docs/models/gpt-6.1-sol"
+    },
+    {
+      "id": "gpt-6-luna",
+      "name": "GPT-6 Luna",
+      "provider": "openai",
+      "role": "Most efficient model for focused, high-volume tasks",
+      "context": "1.05M tokens, 128K output",
+      "price": "$0.10 / $0.50 per MTok",
+      "size": null,
+      "strengths": [
+        "By far the cheapest hosted model here, 20x cheaper than Sol on input, and it keeps the full 1.05M context",
+        "Reasoning effort can be set to `none`, which no other model on this page allows, for latency-critical calls",
+        "Newest knowledge cutoff of the hosted models at May 18, 2026"
+      ],
+      "weaknesses": [
+        "Built for focused tasks: it is the weakest hosted model here on open-ended reasoning and long agentic runs",
+        "Cheap tokens plus a 1M window invites stuffing context that it will not use as well as a larger model would"
+      ],
+      "docs": "https://developers.openai.com/api/docs/models/gpt-6-luna"
+    },
+    {
+      "id": "ollama-gemma4",
+      "name": "Gemma 4",
+      "provider": "ollama",
+      "role": "Google's open-weight multimodal family, frontier-level at each size",
+      "context": "Varies by tag; Ollama defaults the window far lower",
+      "price": null,
+      "size": "e2b, e4b, 12b, 26b, 31b — `ollama pull gemma4`",
+      "strengths": [
+        "Vision, audio, tool calling and thinking in one open-weight family, which is rare locally",
+        "The size ladder reaches from a 2B laptop build to 31B, so the same prompts scale with hardware",
+        "The most actively updated family in the Ollama library"
+      ],
+      "weaknesses": [
+        "The 26B and 31B builds need a 24 GB-class GPU at 4-bit quantization",
+        "Quantized local builds lose quality against the hosted originals in ways benchmarks do not always show",
+        "Multimodal input costs context fast, and local context windows are much tighter than the 1M hosted ones"
+      ],
+      "docs": "https://ollama.com/library/gemma4"
+    },
+    {
+      "id": "ollama-qwen3-5",
+      "name": "Qwen 3.5",
+      "provider": "ollama",
+      "role": "Alibaba's open multimodal family with the widest size ladder",
+      "context": "Varies by tag; Ollama defaults the window far lower",
+      "price": null,
+      "size": "0.8b, 2b, 4b, 9b, 27b, 35b, 122b — `ollama pull qwen3.5`",
+      "strengths": [
+        "Seven sizes from 0.8B to 122B: the easiest family to match to whatever hardware you actually have",
+        "Vision, tool calling and thinking across the range",
+        "Strong multilingual coverage, which the Llama builds are weaker at"
+      ],
+      "weaknesses": [
+        "The 122B tag is out of reach for a single consumer GPU",
+        "Tool-calling reliability under long agentic loops still trails the hosted frontier models",
+        "Fast-moving release cadence means tutorials and Modelfiles go stale quickly"
+      ],
+      "docs": "https://ollama.com/library/qwen3.5"
+    },
+    {
+      "id": "ollama-gpt-oss",
+      "name": "gpt-oss",
+      "provider": "ollama",
+      "role": "OpenAI's open-weight models for reasoning and agentic use",
+      "context": "Varies by tag; Ollama defaults the window far lower",
+      "price": null,
+      "size": "20b, 120b — `ollama pull gpt-oss`",
+      "strengths": [
+        "Adjustable reasoning effort locally, which most open-weight models do not expose",
+        "The 20B build fits a 16 GB card at 4-bit quantization, making it the practical pick for one mid-range GPU",
+        "Built for tool use and agentic loops rather than chat alone"
+      ],
+      "weaknesses": [
+        "Only two sizes, so there is nothing between a 16 GB build and a 120B one",
+        "Not updated in about a year — the Gemma 4 and Qwen 3.5 families have moved on since",
+        "Shares a name and lineage with OpenAI's hosted models but not their quality; do not treat it as a local GPT-6"
+      ],
+      "docs": "https://ollama.com/library/gpt-oss"
+    },
+    {
+      "id": "ollama-qwen3-coder",
+      "name": "Qwen3-Coder",
+      "provider": "ollama",
+      "role": "Long-context open model aimed at agentic coding",
+      "context": "Long-context by local standards; raise `num_ctx` to use it",
+      "price": null,
+      "size": "30b, 480b — `ollama pull qwen3-coder`",
+      "strengths": [
+        "Purpose-built for agentic coding rather than general chat",
+        "The 30B build is the usual choice for a 24 GB card and keeps a long window at small-model speed",
+        "A credible local option for code that must not leave the machine"
+      ],
+      "weaknesses": [
+        "Coding-specialised, so it is a poor general assistant",
+        "The 480B tag is server hardware, not homelab hardware",
+        "Well behind Opus 5.5 and GPT-6.1 Sol on long multi-file changes"
+      ],
+      "docs": "https://ollama.com/library/qwen3-coder"
+    },
+    {
+      "id": "ollama-deepseek-r1",
+      "name": "DeepSeek-R1",
+      "provider": "ollama",
+      "role": "Open reasoning family, from 1.5B to 671B",
+      "context": "Varies by tag; Ollama defaults the window far lower",
+      "price": null,
+      "size": "1.5b, 7b, 8b, 14b, 32b, 70b, 671b — `ollama pull deepseek-r1`",
+      "strengths": [
+        "The open model that made visible chain-of-thought reasoning normal, and still a reference point for it",
+        "The widest size range in the library, including distills that run on a laptop",
+        "Thinking and tool tags across the family"
+      ],
+      "weaknesses": [
+        "About a year old: the 2026 families beat it at equivalent sizes",
+        "The small distills carry the reasoning style without much of the reasoning ability",
+        "Thinking output is verbose, which eats a local context window quickly"
+      ],
+      "docs": "https://ollama.com/library/deepseek-r1"
+    },
+    {
+      "id": "ollama-llama3-1",
+      "name": "Llama 3.1",
+      "provider": "ollama",
+      "role": "Meta's workhorse, still the most-pulled model in the library",
+      "context": "Varies by tag; Ollama defaults the window far lower",
+      "price": null,
+      "size": "8b, 70b, 405b — `ollama pull llama3.1`",
+      "strengths": [
+        "The widest ecosystem support of any local model: nearly every tool, tutorial and Modelfile assumes it works",
+        "The 8B build runs on an 8 GB card and is the safe default for a first local setup",
+        "Reliable tool calling for its age"
+      ],
+      "weaknesses": [
+        "Over a year old and clearly behind Gemma 4 and Qwen 3.5 at the same sizes",
+        "Text only — no vision, no audio",
+        "Its popularity reflects tutorial inertia rather than current quality; pick it for compatibility, not capability"
+      ],
+      "docs": "https://ollama.com/library/llama3.1"
+    }
+  ]
+}
