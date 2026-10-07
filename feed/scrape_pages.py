@@ -6,6 +6,7 @@ import json
 import re
 import urllib.error
 import urllib.request
+from http.client import HTTPException
 from datetime import datetime, timezone
 
 from feed.items import make_item
@@ -49,7 +50,7 @@ def firecrawl_markdown(url: str, api_key: str, timeout: int = 90) -> str:
             payload = json.loads(read_capped(response, MAX_PAGE_BYTES))
     except urllib.error.HTTPError as error:
         raise FetchError(f"Firecrawl HTTP {error.code}") from None
-    except (urllib.error.URLError, TimeoutError, ValueError) as error:  # incl. bad UTF-8 / JSON
+    except (urllib.error.URLError, TimeoutError, HTTPException, ValueError) as error:
         raise FetchError(f"Firecrawl request failed: {type(error).__name__}") from None
     data = payload.get("data") if isinstance(payload, dict) else None
     markdown = data.get("markdown") if isinstance(data, dict) else None

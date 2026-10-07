@@ -62,7 +62,7 @@ def replace(src, dst):
         os.kill(os.getpid(), signal.SIGKILL)
     real_replace(src, dst)
 store.os.replace = replace
-run_pull(Path(sys.argv[1]), NOW, feeds(), PaidFetcher())
+run_pull(Path(sys.argv[1]), NOW, feeds(), PaidFetcher(), clock=lambda: NOW)
 """
 
 

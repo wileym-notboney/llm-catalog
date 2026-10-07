@@ -1,13 +1,15 @@
 # ABOUTME: Tests for one full pull across all five sources, using injected fakes (no network).
 # ABOUTME: Covers stale handling, empty-parse protection, tombstones and prune-failure safety.
 import json
+import io
 from datetime import datetime, timedelta, timezone
+from http.client import BadStatusLine, IncompleteRead
 
 import pytest
 
 import feed.pull as pull_module
 from feed.pull import SOURCES, run_prune, run_pull
-from feed.scrape_pages import FetchError
+from feed.scrape_pages import FetchError, firecrawl_markdown
 from feed.store import StoreError, read_json
 from tests.fixtures import ANTHROPIC_MD, NOUS_MD, atom, rss
 
@@ -49,7 +51,8 @@ def pages(**overrides):
 
 def run(tmp_path, fetch_xml=None, fetch_md="default", now=NOW):
     return run_pull(
-        tmp_path, now, fetch_xml or feeds(), pages() if fetch_md == "default" else fetch_md
+        tmp_path, now, fetch_xml or feeds(), pages() if fetch_md == "default" else fetch_md,
+        clock=lambda: now,
     )
 
 
@@ -155,6 +158,13 @@ BAD_CATALOGS = {
     "item bad publishedAt": {"sources": {}, "items": [{**GOOD_ITEM, "publishedAt": "yesterday"}]},
     "source status not a dict": {"sources": {"s": "bad"}, "items": []},
     "source bad lastOk": {"sources": {"s": {"lastOk": "never"}}, "items": []},
+    "source bad lastError": {"sources": {"s": {"lastError": {}}}, "items": []},
+    **{f"item bad {key}": {"sources": {}, "items": [{**GOOD_ITEM, key: value}]}
+       for key, value in {"title": {}, "summary": [], "kind": "other", "lab": "other",
+                          "source": None, "url": "javascript:alert(1)"}.items()},
+    **{f"item missing {key}": {"sources": {}, "items": [
+        {k: v for k, v in GOOD_ITEM.items() if k != key}]}
+       for key in ("title", "summary", "kind", "source", "url")},
 }
 BAD_STATES = {
     "empty object": {},
@@ -251,3 +261,55 @@ def test_fetch_text_rejects_an_over_limit_feed_without_reading_it_all(monkeypatc
     with pytest.raises(FetchError, match="16 MiB"):
         pull_module.fetch_text("https://example.com/feed.xml")
     assert max(Endless.sizes) <= 16 * 1024 * 1024 + 1
+
+
+def test_a_pull_removes_retired_source_status_but_retains_its_items(tmp_path):
+    retired = "hermes-agent-releases"
+    old_item = {**GOOD_ITEM, "lab": "nous", "source": retired}
+    catalog = {**GOOD_CATALOG, "items": [old_item], "sources": {
+        retired: {"lastOk": None, "lastError": "parsed 0 items"}}}
+    write_files(tmp_path, catalog, GOOD_STATE)
+    result = run(tmp_path)
+    saved = read_json(tmp_path / "items.json", {})
+    assert result["failed"] == {}
+    assert set(saved["sources"]) == {source["id"] for source in SOURCES}
+    assert old_item in saved["items"]
+
+
+@pytest.mark.parametrize("broken_source", ["anthropic-news", "anthropic-api-notes"])
+@pytest.mark.parametrize("error_type", [IncompleteRead, BadStatusLine])
+def test_http_protocol_errors_stale_only_one_source_without_leaking_or_retrying(
+    tmp_path, monkeypatch, caplog, broken_source, error_type
+):
+    run(tmp_path)
+    before = urls(tmp_path)
+    secret = "fc-fake-protocol-error-sentinel"
+    calls = []
+
+    class BrokenResponse(io.BytesIO):
+        def read(self, size=-1):
+            if error_type is IncompleteRead:
+                raise IncompleteRead(secret.encode(), 10)
+            raise BadStatusLine(secret)
+
+    def urlopen(request, timeout):
+        url = json.loads(request.data)["url"] if request.data else request.full_url
+        calls.append(url)
+        if url == URLS[broken_source]:
+            return BrokenResponse()
+        if request.data:
+            return io.BytesIO(json.dumps({"success": True, "data": {
+                "markdown": pages()(url)}}).encode())
+        return io.BytesIO(feeds()(url).encode())
+
+    monkeypatch.setattr("urllib.request.urlopen", urlopen)
+    next_day = NOW + timedelta(days=1)
+    result = run_pull(tmp_path, next_day, pull_module.fetch_text,
+                      lambda url: firecrawl_markdown(url, secret), clock=lambda: next_day)
+    assert list(result["failed"]) == [broken_source]
+    assert len(result["ok"]) == 4
+    assert calls.count(URLS[broken_source]) == 1
+    assert before <= urls(tmp_path)
+    assert secret not in caplog.text
+    for path in tmp_path.glob("*.json"):
+        assert secret not in path.read_text()

@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import logging
 import os
+from http.client import HTTPException
 import urllib.error
 import urllib.request
 import xml.etree.ElementTree as ET
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Callable
 
@@ -72,6 +73,8 @@ def fetch_text(url: str, timeout: int = 30) -> str:
             return read_capped(response, MAX_XML_BYTES).decode("utf-8")
     except urllib.error.HTTPError as error:
         raise FetchError(f"HTTP {error.code}") from None
+    except HTTPException as error:
+        raise FetchError(f"HTTP response failed: {type(error).__name__}") from None
 
 
 def markdown_fetcher() -> FetchMarkdown | None:
@@ -119,7 +122,8 @@ def save_pruned_attempts(data_dir: Path, attempts: dict, now: datetime) -> None:
 
 
 def run_pull(
-    data_dir: Path, now: datetime, fetch_xml: FetchText, fetch_md: FetchMarkdown | None
+    data_dir: Path, now: datetime, fetch_xml: FetchText, fetch_md: FetchMarkdown | None,
+    *, clock: Callable[[], datetime] | None = None,
 ) -> dict:
     """Pull every source once, as the data directory's only writer (raises WriterBusy otherwise).
 
@@ -128,26 +132,34 @@ def run_pull(
     whether the request succeeds, fails or the process dies. Deferred sources are not failures.
     """
     with writer_lock(data_dir):
-        return _pull_locked(data_dir, now, fetch_xml, fetch_md)
+        return _pull_locked(data_dir, now, fetch_xml, fetch_md,
+                            clock or (lambda: datetime.now(timezone.utc)))
 
 
 def _pull_locked(
-    data_dir: Path, now: datetime, fetch_xml: FetchText, fetch_md: FetchMarkdown | None
+    data_dir: Path, now: datetime, fetch_xml: FetchText, fetch_md: FetchMarkdown | None,
+    clock: Callable[[], datetime],
 ) -> dict:
     catalog = read_json(data_dir / "items.json", _empty_catalog(), validate_catalog)
     state = read_json(data_dir / "state.json", _empty_state(), validate_state)
     attempts = read_attempts(data_dir)
+    active_sources = {source["id"] for source in SOURCES}
+    catalog["sources"] = {sid: status for sid, status in catalog["sources"].items()
+                          if sid in active_sources}
     incoming, ok, failed, deferred = [], [], {}, []
     for source in SOURCES:
         status = catalog["sources"].setdefault(source["id"], {"lastOk": None, "lastError": None})
         if source["via"] == "firecrawl" and fetch_md is not None:
-            if attempted_today(attempts, source["id"], now):
+            # Earlier network calls may have crossed midnight since the pull started.
+            attempted_at = clock().astimezone(timezone.utc)
+            if attempted_today(attempts, source["id"], attempted_at):
                 # lastError is what the UI reads as "stale"; the prefix says why.
                 status["lastError"] = "deferred: paid source already requested today (UTC)"
                 deferred.append(source["id"])
                 log.info("source %s deferred until the next UTC day", source["id"])
                 continue
-            attempts["attempts"][source["id"]] = {"date": now.date().isoformat(), "at": iso(now)}
+            attempts["attempts"][source["id"]] = {
+                "date": attempted_at.date().isoformat(), "at": iso(attempted_at)}
             write_json(data_dir / "attempts.json", attempts)
         try:
             found = collect(source, fetch_xml, fetch_md)

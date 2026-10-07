@@ -40,7 +40,7 @@ class PaidFetcher:
 
 
 def pull(tmp_path, fetcher, now=NOW):
-    return run_pull(tmp_path, now, feeds(), fetcher)
+    return run_pull(tmp_path, now, feeds(), fetcher, clock=lambda: now)
 
 
 def attempts(tmp_path):
@@ -79,7 +79,8 @@ def test_cli_pulls_and_scheduler_restarts_cannot_exceed_two_paid_calls_a_day(tmp
     for restart in range(3):  # a fresh scheduler step per "process start", catch-up always due
         due = NOW + timedelta(hours=2 + restart)
         step(tmp_path, due, datetime(2026, 10, 5, 0, 0).time(),
-             lambda directory, moment: run_pull(directory, moment, feeds(), fetcher))
+             lambda directory, moment: run_pull(directory, moment, feeds(), fetcher,
+                                                clock=lambda: moment))
         (tmp_path / "state.json").unlink()  # force "never pulled" so every step really pulls
     assert len(fetcher.calls) == 2
     assert fetcher.paid("anthropic-news") == fetcher.paid("nous-blog") == 1
@@ -92,6 +93,30 @@ def test_the_next_utc_day_permits_one_new_attempt_per_source(tmp_path):
     assert len(fetcher.calls) == 2
     pull(tmp_path, fetcher, datetime(2026, 10, 6, 0, 0, tzinfo=timezone.utc))
     assert len(fetcher.calls) == 4
+
+
+def test_a_pull_crossing_midnight_records_each_request_on_its_actual_utc_day(tmp_path):
+    before = datetime(2026, 10, 5, 23, 59, 59, tzinfo=timezone.utc)
+    after = before + timedelta(seconds=2)
+    current = [before]
+    calls = []
+
+    def fetch_xml(url):
+        current[0] = after  # free feeds finish after midnight, before the Nous request
+        return feeds()(url)
+
+    def fetch_md(url):
+        sid = next(sid for sid, source_url in URLS.items() if source_url == url)
+        # The correct date must already be on disk before the paid request starts.
+        assert attempts(tmp_path)["attempts"][sid]["date"] == current[0].date().isoformat()
+        calls.append((current[0].date(), sid))
+        return PAGES[url]
+
+    run_pull(tmp_path, before, fetch_xml, fetch_md, clock=lambda: current[0])
+    summary = run_pull(tmp_path, after, fetch_xml, fetch_md, clock=lambda: current[0])
+    assert summary["deferred"] == ["nous-blog"]
+    assert calls == [(before.date(), "anthropic-news"), (after.date(), "nous-blog"),
+                     (after.date(), "anthropic-news")]
 
 
 def test_a_deferred_source_keeps_its_items_and_renders_as_stale_but_not_failed(tmp_path):
