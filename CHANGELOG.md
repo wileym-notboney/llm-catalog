@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Reshaped the model catalog at `#/models` from a stacked list of full-height cards into a
+  pick-to-compare board: a picker of model chips puts the selected models side by side in
+  aligned attribute rows (role, context, price/size, strengths, weaknesses) so specs line up
+  for scanning. New controls beyond the provider filter: sort by name/context/price, a
+  hosted-vs-local toggle, and an expand/collapse-all for the two detail rows. The board
+  horizontally scrolls with the attribute labels pinned to the left. Pure helpers
+  (`filterByHost`, `sortModels`, `parseMagnitude`, `contextKey`, `priceKey`) live in
+  `app/src/lib/models.ts` with offline checks in `app/tests/models.test.mjs`; `models.json`
+  and the Python catalog-shape test are unchanged.
 - Fixed six review findings: interrupted HTTP responses now stale only their source;
   paid attempts use the current UTC date at each request, including pulls crossing midnight;
   retired source statuses are removed on pull while their articles follow normal retention;
