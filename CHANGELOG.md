@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added `.claude/launch.json` so the dev server (`npm --prefix app run dev`, port 5173) can
+  be launched and previewed from Claude Code without hand-wiring the command each time.
 - Reshaped the model catalog at `#/models` from a stacked list of full-height cards into a
   pick-to-compare board: a picker of model chips puts the selected models side by side in
   aligned attribute rows (role, context, price/size, strengths, weaknesses) so specs line up
