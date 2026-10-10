@@ -37,6 +37,8 @@ Dev setup: `python3 -m venv .venv && .venv/bin/pip install pytest`. Python 3.10+
 `schedule`, `__main__`); `serve.py` is the server and scheduler thread; `app/` is the UI
 source and `app/dist/index.html` is its committed single-file build; `tests/` has one
 module per feed module plus `fixtures.py`. `data/` is runtime state and git-ignored.
+`decisions/` holds Architecture Decision Records — the on-demand "why" behind non-obvious
+choices (LAN exposure, bundler, dependency set); this file stays the lean index.
 
 In `app/src/`: `App.tsx` is the shell (masthead, nav, hash route), `Feed.tsx` and
 `Models.tsx` are the two pages, `Chips.tsx` is the filter row both use, `lib/feed.ts` and
@@ -65,7 +67,7 @@ In `app/src/`: `App.tsx` is the shell (masthead, nav, hash route), `Feed.tsx` an
 - Per-source status lives only in `items.json`; `state.json` holds `lastPull`, `lastPrune`,
   `tombstones`. One source of truth.
 - `data/attempts.json` holds one record per paid source per UTC day (`{"attempts": {id:
-  {"date", "at"}}}`), written before the request, never served, never committed. A corrupt
+{"date", "at"}}}`), written before the request, never served, never committed. A corrupt
   file is refused, not read as empty. The writer lock covers it along with items/state.
 - `DATA_DIR` must be on a local filesystem. NFS, SMB and sshfs are unsupported: `flock` does
   not serialize writers across hosts, so two hosts could both think they own the directory.

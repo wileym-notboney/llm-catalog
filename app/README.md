@@ -1,32 +1,40 @@
-# React + TypeScript + Vite
+# UI source (`app/`)
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+The dashboard's frontend: React + TypeScript, styled with Tailwind, in the Mythological
+Punk theme. Two hash-routed pages live here — the feed (`#/`) and the model catalog
+(`#/models`) — assembled in `src/App.tsx`. See the repo root `AGENTS.md` for the source
+layout and the invariants this UI must hold.
 
-Currently, two official plugins are available:
+## The committed build
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+`dist/index.html` is a **single self-contained file** (JS, CSS and the model catalog all
+inlined) and it is committed to the repo, so a fresh clone of the project runs with no Node
+installed — `serve.py` just serves it. Regenerate it after any UI or `src/models.json`
+change:
 
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```sh
+pnpm install          # once, or after dependency changes
+pnpm run bundle        # Parcel builds, html-inline inlines -> rewrites dist/index.html
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+`pnpm run bundle` is the **only** thing that should ever write `dist/index.html`.
+
+## Scripts
+
+| Script            | What it does                                                                                                |
+| ----------------- | ----------------------------------------------------------------------------------------------------------- |
+| `pnpm run dev`    | Parcel dev server with HMR on <http://localhost:1234>; output goes to a throwaway `.bundle/`, never `dist/` |
+| `pnpm run bundle` | Production build → inlined `dist/index.html` (the committed artifact)                                       |
+| `pnpm test`       | Offline regression checks via Node's built-in test runner (`tests/*.test.mjs`)                              |
+| `pnpm run lint`   | oxlint                                                                                                      |
+
+## Toolchain
+
+Parcel is the single bundler (the `index.html` entry drives both `dev` and `bundle`);
+`html-inline` collapses the Parcel output into one file. Tailwind runs through PostCSS
+(`tailwind.config.js`, `postcss.config.js`). Runtime dependencies are deliberately just
+`react` and `react-dom` — see `decisions/0002-single-bundler-parcel.md` and
+`decisions/0003-dependency-trim.md` for why.
+
+Theme tokens originate from the Mythological Punk plugin and live in `src/theme.css`.
+Dark only, system fonts, no external assets.
