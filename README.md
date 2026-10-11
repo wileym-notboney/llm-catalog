@@ -121,6 +121,21 @@ Restart=on-failure
 WantedBy=multi-user.target
 ```
 
+### Reach it from the LAN (Tailscale)
+
+`serve.py` stays bound to `127.0.0.1` and has no auth, so don't bind it to `0.0.0.0`.
+To reach the dashboard from other devices, front the loopback listener with Tailscale —
+authentication is handled by your tailnet, and nothing in `serve.py` changes:
+
+```sh
+tailscale serve --bg 8787        # serves http://127.0.0.1:8787 to your tailnet over HTTPS
+tailscale serve status           # show what is exposed
+tailscale serve --https=443 off  # stop exposing it
+```
+
+This keeps the page private to devices on your tailnet. Do **not** use `tailscale funnel`,
+which would publish it to the public internet — the dashboard has no authentication of its own.
+
 ## Develop
 
 ```sh
@@ -132,12 +147,16 @@ Frontend regression checks use Node's built-in test runner and the existing Type
 dev dependency: `cd app && pnpm test`. They run offline and cover catalog validation,
 calendar dates, and visit tracking after successful or failed loads.
 
-The UI source is in `app/` (React + Vite + Tailwind). `app/dist/index.html` is the
+The UI source is in `app/` (React + Parcel + Tailwind). `app/dist/index.html` is the
 committed build, so a fresh clone runs without Node. After changing the UI:
 
 ```sh
 cd app && pnpm install && pnpm run bundle   # rewrites app/dist/index.html
 ```
+
+For a live-reload loop while editing, `cd app && pnpm run dev` starts Parcel's dev server
+on <http://localhost:1234> (its output goes to a throwaway `.bundle/`, so the committed
+`app/dist/index.html` is never touched — only `pnpm run bundle` rewrites that).
 
 Theme tokens come from `~/.hermes/desktop-plugins/mythological-punk/mythological-punk.yaml`
 and live in `app/src/theme.css`. Dark only, system fonts, no external assets.

@@ -2,8 +2,24 @@
 
 ## Unreleased
 
-- Added `.claude/launch.json` so the dev server (`npm --prefix app run dev`, port 5173) can
-  be launched and previewed from Claude Code without hand-wiring the command each time.
+- Consolidated the `app/` toolchain to a single bundler: removed the vestigial Vite setup
+  (`vite.config.ts`, `tsconfig.node.json`, the `vite`/`@vitejs/plugin-react`/`@types/node`
+  devDeps, the `build`/`preview` scripts) and made Parcel the only bundler. `pnpm run dev` is
+  now Parcel's HMR server on port 1234, writing to a git-ignored `.bundle/` so the committed
+  `app/dist/index.html` is never clobbered; `pnpm run bundle` (the committed-artifact path) is
+  unchanged. See `decisions/0002-single-bundler-parcel.md`.
+- Trimmed `app/` runtime dependencies to `react` + `react-dom` only, dropping ~30
+  never-imported packages (all `@radix-ui/*`, form/carousel/date/icon libs, `zod`, etc.) plus
+  the unused `@/*` path alias and `parcel-resolver-tspaths`. The committed
+  `app/dist/index.html` is byte-identical (nothing removed was imported). See
+  `decisions/0003-dependency-trim.md`.
+- Documented reaching the dashboard from the LAN via `tailscale serve` (README "Keep it
+  running"); `serve.py` stays bound to `127.0.0.1` with no auth added. See
+  `decisions/0001-expose-via-tailscale.md`.
+- Added a `decisions/` directory of Architecture Decision Records (0001–0003) and a pointer
+  to it from `AGENTS.md`, which stays the lean always-loaded index. Rewrote the stock-template
+  `app/README.md` to describe this app's Parcel build.
+- Added `.claude/launch.json` so the dev server (`npm --prefix app run dev`, Parcel on port 1234) can be launched and previewed from Claude Code without hand-wiring the command each time.
 - Reshaped the model catalog at `#/models` from a stacked list of full-height cards into a
   pick-to-compare board: a picker of model chips puts the selected models side by side in
   aligned attribute rows (role, context, price/size, strengths, weaknesses) so specs line up
