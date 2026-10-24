@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Added `site/`, a standalone single-file model codex page published as a claude.ai Artifact
+  (not served by `serve.py`, so no new served path). Full-width bands in each provider's brand
+  colours, one neutral dark card for every model, a provider filter, and a pick-2-to-4 side-by-side
+  compare. `site/build.py` (stdlib only) inlines `app/src/models.json` into `site/template.html`
+  and writes the committed `site/index.html`. No navy or blue-tinted colours; card text is 7:1
+  contrast or better. No new dependencies.
 - Added `.claude/launch.json` so the dev server (`npm --prefix app run dev`, port 5173) can
   be launched and previewed from Claude Code without hand-wiring the command each time.
 - Reshaped the model catalog at `#/models` from a stacked list of full-height cards into a
