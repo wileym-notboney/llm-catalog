@@ -1,0 +1,660 @@
+<title>LLM Feed Codex</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: masthead with two tabs. News feed: one merged chronological list of stories from the
+   repo's daily pull. Models: provider filter, then one full-width band per provider; picking models
+   fills a tray at the bottom and Compare swaps the bands for a side-by-side table.
+   Dark only by choice: the Mythological Punk theme is a single visual world. */
+:root {
+  /* neutral graphite page: the provider bands carry all the colour */
+  --bg: #181818;
+  --panel-2: #141414;
+  --card: #222222;
+  --text: #e6e6e6;
+  --muted: #a3a3a3;
+  --primary: #d3a849;
+  --accent: #d3a849;
+  --success: #61c6a5;
+  --destructive: #db6572;
+  --line: rgba(255, 255, 255, 0.2);
+  --line-soft: rgba(255, 255, 255, 0.1);
+  --cobalt-wash: rgba(255, 255, 255, 0.12);
+  --radius: 0.35rem;
+  --font-display: "Cinzel", "Trajan Pro", Georgia, serif;
+  --font-body: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body {
+  margin: 0;
+  background:
+var(--bg);
+  color: var(--text);
+  font: 15px/1.6 var(--font-body);
+  letter-spacing: 0.01em;
+}
+a { color: var(--primary); }
+a:focus-visible, button:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+.wrap {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.wrap.end { padding-bottom: 96px; }
+
+/* ---------- masthead ---------- */
+.masthead {
+  padding-block: 20px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 24px;
+  border-bottom: 1px solid var(--line);
+}
+.brand { display: flex; align-items: center; gap: 12px; color: var(--text); }
+.brand svg { width: 44px; height: 44px; flex: none; }
+.brand b { font: 800 1.05rem/1 var(--font-display); letter-spacing: 0.16em; text-transform: uppercase; }
+.brand small { display: block; margin-top: 4px; color: var(--muted); font: 0.72rem var(--font-mono); letter-spacing: 0.08em; }
+.stamp { font: 0.78rem var(--font-mono); color: var(--muted); }
+.stamp b { color: var(--accent); font-weight: 500; }
+
+.chip {
+  display: inline-block;
+  padding: 4px 12px;
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  font: 500 0.82rem var(--font-body);
+  text-decoration: none;
+  cursor: pointer;
+  clip-path: polygon(7px 0, 100% 0, calc(100% - 7px) 100%, 0 100%);
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+}
+.chip:hover:not(:disabled) { color: var(--text); border-color: var(--primary); }
+.chip[aria-pressed="true"] { background: var(--cobalt-wash); color: var(--text); border-color: var(--primary); }
+.chip:disabled { opacity: 0.4; cursor: not-allowed; }
+.chip.solid { background: var(--accent); border-color: var(--accent); color: var(--bg); font-weight: 600; }
+.chip.solid:hover:not(:disabled) { color: var(--bg); border-color: var(--text); }
+
+/* Provider brand colours.
+   Anthropic: dark #141413, ivory #faf9f5, mid gray #b0aea5, orange #d97757, blue #6a9bcc (Anthropic brand guidelines).
+   OpenAI: black and white, "no singular brand color"; grays and blue-400 from its 2022 brand guidelines.
+   Ollama: black and white, with its charcoal #525252 and hairline #e5e5e5.
+   Brand colour is used as an accent only (strips, tags, headings), never as a large fill: big orange,
+   white and black blocks side by side force the eye to re-adapt and are tiring to read against.
+   Green/red for strengths/weaknesses are semantic, not brand. */
+.lab-anthropic {
+  --strip: #d97757;
+}
+.lab-openai {
+  --strip: #e6e6e6;
+}
+.lab-nous { --strip: var(--muted); }
+.lab-ollama {
+  --strip: #e6e6e6;
+}
+
+/* ---------- catalog ---------- */
+.catalog { padding-top: 24px; display: grid; gap: 24px; }
+#bands { display: grid; }
+.catalog > .wrap { width: 100%; }
+.catalog-tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chips .chip[data-p]::before {
+  content: "";
+  display: inline-block;
+  width: 8px; height: 8px;
+  margin-right: 7px;
+  background: var(--strip, var(--muted));
+  transform: rotate(45deg) translateY(-1px);
+}
+
+/* provider sections: separated by space and a hairline, named by a heading in the brand colour */
+.band {
+  padding-block: 28px 32px;
+  border-top: 1px solid var(--line-soft);
+}
+.band-in {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid;
+  gap: 18px;
+}
+.band-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; }
+.band-head h2 {
+  margin: 0;
+  font: 800 clamp(1.35rem, 3vw, 1.8rem)/1.1 var(--font-display);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--strip);
+}
+.band-head .kind {
+  font: 500 0.7rem var(--font-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  padding: 1px 8px;
+}
+.band-head .n { font: 0.76rem var(--font-mono); color: var(--muted); }
+
+.models { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 14px; }
+.model {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 18px 16px;
+  min-width: 0;
+  /* One dark card for every provider, so models are read and compared on equal terms; the band and
+     the top strip carry the brand. Dark gray rather than pure black limits halation on light text,
+     off-white text instead of pure white for the same reason; every text colour is 7:1 or better. */
+  --c-bg: var(--card); --c-fg: var(--text); --c-muted: var(--muted); --c-line: rgba(255, 255, 255, 0.1);
+  --c-pro: #6fcf97; --c-con: #f28b82; --c-code: #e0b45c; --c-link: #e0b45c;
+  background: var(--c-bg);
+  color: var(--c-fg);
+  border-top: 4px solid var(--strip);
+  box-shadow: inset 0 0 0 1px var(--c-line);
+  clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+  transition: box-shadow 0.15s;
+}
+.model.picked { box-shadow: inset 0 0 0 2px var(--c-link); }
+.model code { color: var(--c-code); }
+.model .chip { color: var(--c-muted); border-color: var(--c-line); }
+.model .chip:not([aria-pressed="true"]):hover:not(:disabled) { color: var(--c-fg); border-color: var(--c-fg); }
+.model .chip[aria-pressed="true"] { background: var(--c-link); color: var(--c-bg); border-color: var(--c-link); }
+.model h3 { margin: 0; font: 600 1.12rem/1.25 var(--font-body); }
+.model .role { margin: 2px 0 0; color: var(--c-muted); font-size: 0.88rem; }
+.spec { margin: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 3px 12px; font-size: 0.8rem; }
+.spec dt { font: 0.68rem var(--font-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--c-muted); padding-top: 2px; }
+.spec dd { margin: 0; font-family: var(--font-mono); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+code { color: var(--accent); font-family: var(--font-mono); }
+.verdict { display: grid; gap: 8px; }
+.verdict h4 { margin: 0 0 2px; font: 600 0.7rem var(--font-mono); letter-spacing: 0.14em; text-transform: uppercase; }
+.pro h4 { color: var(--c-pro, var(--success)); }
+.con h4 { color: var(--c-con, var(--destructive)); }
+.verdict ul, .cmp ul { margin: 0; padding-left: 1.1em; font-size: 0.86rem; display: grid; gap: 4px; }
+.pro li::marker { content: "+  "; color: var(--c-pro, var(--success)); }
+.con li::marker { content: "\2212  "; color: var(--c-con, var(--destructive)); }
+.model .foot { margin-top: auto; padding-top: 6px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.docs { font: 500 0.8rem var(--font-mono); color: var(--c-link, var(--primary)); text-decoration: underline; text-underline-offset: 3px; }
+
+/* ---------- tabs ---------- */
+.tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+.tabs .chip { font-size: 0.9rem; padding: 6px 16px; }
+
+/* ---------- news feed ---------- */
+.feed-view { padding-top: 24px; display: grid; gap: 16px; }
+.status { margin: 0; font: 0.8rem var(--font-mono); color: var(--muted); }
+.status b { color: var(--text); font-weight: 500; }
+.banner { margin: 0; padding: 10px 14px; border-left: 3px solid var(--accent); background: rgba(211, 168, 73, 0.1); font-size: 0.88rem; }
+.banner ul { margin: 4px 0 0; padding-left: 1.1em; }
+.filters { display: flex; flex-wrap: wrap; gap: 10px 28px; }
+.filter-group { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.filter-group > span { font: 600 0.68rem var(--font-mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin-right: 4px; }
+.stories { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.story {
+  display: grid;
+  gap: 6px;
+  padding: 14px 18px;
+  min-width: 0;
+  background: var(--card);
+  border-left: 3px solid var(--strip);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+.story .meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; font: 0.76rem var(--font-mono); color: var(--muted); }
+.tag {
+  padding: 1px 8px;
+  color: var(--strip);
+  border: 1px solid currentColor;
+  font: 600 0.7rem var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.new { color: var(--bg); background: var(--accent); padding: 0 6px; font-weight: 600; }
+.story h2 { margin: 0; font: 600 1.05rem/1.35 var(--font-body); }
+.story h2 a { color: var(--text); text-decoration: underline; text-decoration-color: rgba(255, 255, 255, 0.3); text-underline-offset: 3px; }
+.story h2 a:hover { text-decoration-color: var(--accent); }
+.story p { margin: 0; color: #c4c4c4; font-size: 0.9rem; max-width: 75ch; overflow-wrap: anywhere; }
+.empty { color: var(--muted); }
+
+/* ---------- compare tray ---------- */
+.tray {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  z-index: 50;
+  padding-top: 12px;
+  padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  background: rgba(20, 20, 20, 0.96);
+  border-top: 1px solid var(--accent);
+  backdrop-filter: blur(6px);
+}
+.tray-in { max-width: 1080px; margin: 0 auto; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.tray-label { font: 0.76rem var(--font-mono); color: var(--muted); }
+.picks { display: flex; flex-wrap: wrap; gap: 6px; flex: 1 1 200px; min-width: 0; }
+.pick {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 2px 4px 2px 8px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--strip);
+  background: var(--card);
+  color: var(--text);
+  font-size: 0.8rem;
+}
+.pick button { background: none; border: 0; color: inherit; opacity: 0.7; cursor: pointer; font-size: 1rem; line-height: 1; padding: 2px 4px; }
+.pick button:hover { opacity: 1; }
+
+/* ---------- compare view ---------- */
+.compare { padding-block: 24px 0; display: grid; gap: 16px; }
+.compare-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; }
+.compare-head h2 { margin: 0; font: 800 clamp(1.3rem, 3vw, 1.7rem)/1.1 var(--font-display); letter-spacing: 0.08em; text-transform: uppercase; }
+.compare-head .actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.scroll { overflow-x: auto; border: 1px solid var(--line-soft); }
+.cmp { border-collapse: collapse; width: 100%; min-width: 640px; font-size: 0.86rem; }
+.cmp th, .cmp td { padding: 10px 14px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line-soft); }
+.cmp tbody th {
+  position: sticky; left: 0; z-index: 1;
+  width: 120px;
+  background: var(--panel-2);
+  font: 600 0.68rem var(--font-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.cmp thead th { background: var(--card); color: var(--text); border-top: 3px solid var(--strip, transparent); }
+.cmp thead th:first-child { position: sticky; left: 0; z-index: 2; background: var(--panel-2); }
+.cmp thead .prov { display: block; font: 500 0.68rem var(--font-mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--strip, var(--muted)); }
+.cmp thead .name { display: block; font: 600 1rem/1.3 var(--font-body); color: inherit; }
+.cmp td.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.cmp td.none { color: var(--muted); font-style: italic; }
+.cmp td { border-left: 1px solid var(--line-soft); }
+
+footer { margin-top: 40px; padding-block: 24px; border-top: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: space-between; color: var(--muted); font: 0.78rem var(--font-mono); }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="brass" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#d0a85e"/><stop offset="1" stop-color="#8c622e"/></linearGradient>
+    <symbol id="crest" viewBox="0 0 64 64">
+      <circle cx="32" cy="32" r="28" fill="#1e1e1e" stroke="url(#brass)" stroke-width="3"/>
+      <path d="M16 42h32M20 39h24M23 39V27h18v12M20 27h24l-12-9z" fill="none" stroke="#e7e2d8" stroke-width="3" stroke-linejoin="round"/>
+      <path d="m33 12-5 13h5l-3 11 9-15h-5l4-9z" fill="#e0b45c"/>
+    </symbol>
+  </defs>
+</svg>
+
+<div class="wrap">
+  <header class="masthead">
+    <span class="brand">
+      <svg role="img" aria-label="LLM Feed crest"><use href="#crest"/></svg>
+      <span><b>LLM Feed</b><small>Anthropic &middot; OpenAI &middot; Nous &middot; Ollama</small></span>
+    </span>
+    <nav class="tabs" aria-label="Pages">
+      <button class="chip" type="button" data-view="feed">News feed</button>
+      <button class="chip" type="button" data-view="models">Models</button>
+    </nav>
+  </header>
+
+  <main class="feed-view" id="feed-view">
+    <p class="status" id="feed-status"></p>
+    <div class="banner" id="feed-stale" role="status" hidden></div>
+    <div class="filters">
+      <div class="filter-group" role="group" aria-label="Filter by lab" id="feed-labs"><span>Lab</span></div>
+      <div class="filter-group" role="group" aria-label="Filter by kind" id="feed-kinds"><span>Kind</span></div>
+    </div>
+    <ol class="stories" id="stories"></ol>
+  </main>
+
+</div>
+
+<main class="catalog" id="catalog-view">
+  <div class="wrap catalog-tools">
+    <div class="chips" role="group" aria-label="Filter by provider" id="filters"></div>
+    <span class="stamp">Reviewed <b id="reviewed"></b> &middot; <span id="count"></span></span>
+  </div>
+  <div id="bands"></div>
+</main>
+
+<div class="wrap end">
+
+  <main class="compare" id="compare-view" hidden>
+    <div class="compare-head">
+      <h2 id="compare-title">Compare</h2>
+      <div class="actions">
+        <button class="chip" type="button" id="back">&larr; All models</button>
+        <button class="chip" type="button" id="clear-2">Clear</button>
+      </div>
+    </div>
+    <div class="scroll"><table class="cmp" id="cmp"></table></div>
+  </main>
+
+  <footer>
+    <span>&copy; 2026 wileym-notboney &middot; MIT</span>
+    <a href="https://github.com/wileym-notboney/llm-catalog">Source</a>
+  </footer>
+</div>
+
+<div class="tray" id="tray" hidden>
+  <div class="tray-in">
+    <span class="tray-label" id="tray-label"></span>
+    <div class="picks" id="picks"></div>
+    <button class="chip" type="button" id="clear">Clear</button>
+    <button class="chip solid" type="button" id="go">Compare</button>
+  </div>
+</div>
+
+<script id="catalog" type="application/json">{"reviewedAt": "2026-10-06", "models": [{"id": "claude-fable-5-1", "name": "Claude Fable 5.1", "provider": "anthropic", "role": "Demanding reasoning and long-horizon agentic work", "context": "1M tokens, 128K output", "price": "$10 / $50 per MTok", "size": null, "strengths": ["Anthropic's pick when evals on Opus 5.5 at higher effort still fall short", "Adaptive thinking is always on and defaults to high effort, so hard problems get budget without prompting for it", "Holds a plan together across very long agentic runs"], "weaknesses": ["The most expensive model in the family at 2.5x Opus 5.5 per token, and slower to first output", "Overkill for routine work: Opus 5.5 matches it on most tasks for less", "OpenAI's GPT-6.1 Sol claims comparable results on agentic coding at a fifth of the price, so it is worth benchmarking on your own workload"], "docs": "https://platform.claude.com/docs/en/models/fable-5-1/overview"}, {"id": "claude-opus-5-5", "name": "Claude Opus 5.5", "provider": "anthropic", "role": "Long-running agentic coding and knowledge work", "context": "1M tokens, 128K output", "price": "$4 / $20 per MTok, $0.20 cache reads", "size": null, "strengths": ["The default recommendation for most workloads: Fable-level results on most work at a lower price", "Cache reads at $0.20/MTok make long agentic sessions, where cached context dominates the bill, much cheaper", "Adaptive thinking always on, with effort tunable from low to max"], "weaknesses": ["Moderate latency: not the one for interactive, token-by-token UX", "Still 2x Sonnet 5.5 per token, and Sonnet 5.5 is close enough on many tasks that the gap has to be measured, not assumed"], "docs": "https://platform.claude.com/docs/en/models/opus-5-5/overview"}, {"id": "claude-sonnet-5-5", "name": "Claude Sonnet 5.5", "provider": "anthropic", "role": "The best combination of speed and intelligence", "context": "1M tokens, 128K output", "price": "$2 / $10 per MTok, $0.20 cache reads", "size": null, "strengths": ["Fast with a 1M context window, which is the combination most product work actually needs", "Defaults to high effort, so quality does not depend on remembering to raise it", "Needs fewer tokens than Sonnet 5 for the same work, so cost per task drops even at identical token prices"], "weaknesses": ["Thinking is adaptive rather than always on, so the hardest problems need the effort level raised deliberately", "Falls behind Opus 5.5 and Fable 5.1 on the longest agentic runs"], "docs": "https://platform.claude.com/docs/en/models/sonnet-5-5/overview"}, {"id": "claude-haiku-4-5", "name": "Claude Haiku 4.5", "provider": "anthropic", "role": "Fastest model with near-frontier intelligence", "context": "200K tokens, 64K output", "price": "$1 / $5 per MTok", "size": null, "strengths": ["The fastest Claude, and the cheapest, for classification, extraction and high-volume calls", "Near-frontier quality for its tier at a fifth of Opus 5.5's token price"], "weaknesses": ["Knowledge cutoff of Feb 2025 is well over a year behind the 5.5 family's Jun 2026", "200K context and 64K output, a fifth of the rest of the family", "The oldest model listed here and scheduled for retirement no sooner than Oct 15, 2026; Haiku 5.5 was announced as joining the 5.5 family, so check for it before building on this one"], "docs": "https://platform.claude.com/docs/en/models/haiku-4-5/overview"}, {"id": "gpt-6-astra", "name": "GPT-6 Astra", "provider": "openai", "role": "OpenAI's most capable model for the most demanding work", "context": "1.05M tokens, 128K output", "price": "$10 / $50 per MTok", "size": null, "strengths": ["OpenAI's flagship for complex reasoning and coding, and their strongest computer-use model", "Effort levels run from low all the way to max, so one model covers a wide cost/quality range", "Better than its predecessors at making a sensible call when instructions leave room for interpretation"], "weaknesses": ["Priced like Fable 5.1 at $10/$50, the most expensive option on this page", "GPT-6.1 Sol reaches near-Astra quality at a fifth of the price, which makes Astra hard to justify outside the hardest work", "Knowledge cutoff Apr 30, 2026"], "docs": "https://developers.openai.com/api/docs/models/gpt-6-astra"}, {"id": "gpt-6-1-sol", "name": "GPT-6.1 Sol", "provider": "openai", "role": "Near-Astra performance for complex work at a lower cost", "context": "1.05M tokens, 128K output", "price": "$2 / $10 per MTok, $0.10 cached input", "size": null, "strengths": ["Nearly matches Astra on agentic coding, computer use and professional work at a fifth of its token price", "Fewer factual errors than GPT-6 Sol and more reliable at respecting explicit restrictions during agentic tasks", "A `pro` reasoning mode is available for hard problems without switching models"], "weaknesses": ["`pro` mode spends far more reasoning tokens, costing several times a normal request and taking much longer — not for everyday work", "Not available in ChatGPT's Chat surface at launch (Work and Codex only), so behaviour there can differ from the API", "Knowledge cutoff Apr 30, 2026"], "docs": "https://developers.openai.com/api/docs/models/gpt-6.1-sol"}, {"id": "gpt-6-luna", "name": "GPT-6 Luna", "provider": "openai", "role": "Most efficient model for focused, high-volume tasks", "context": "1.05M tokens, 128K output", "price": "$0.10 / $0.50 per MTok", "size": null, "strengths": ["By far the cheapest hosted model here, 20x cheaper than Sol on input, and it keeps the full 1.05M context", "Reasoning effort can be set to `none`, which no other model on this page allows, for latency-critical calls", "Newest knowledge cutoff of the hosted models at May 18, 2026"], "weaknesses": ["Built for focused tasks: it is the weakest hosted model here on open-ended reasoning and long agentic runs", "Cheap tokens plus a 1M window invites stuffing context that it will not use as well as a larger model would"], "docs": "https://developers.openai.com/api/docs/models/gpt-6-luna"}, {"id": "ollama-gemma4", "name": "Gemma 4", "provider": "ollama", "role": "Google's open-weight multimodal family, frontier-level at each size", "context": "Varies by tag; Ollama defaults the window far lower", "price": null, "size": "e2b, e4b, 12b, 26b, 31b — `ollama pull gemma4`", "strengths": ["Vision, audio, tool calling and thinking in one open-weight family, which is rare locally", "The size ladder reaches from a 2B laptop build to 31B, so the same prompts scale with hardware", "The most actively updated family in the Ollama library"], "weaknesses": ["The 26B and 31B builds need a 24 GB-class GPU at 4-bit quantization", "Quantized local builds lose quality against the hosted originals in ways benchmarks do not always show", "Multimodal input costs context fast, and local context windows are much tighter than the 1M hosted ones"], "docs": "https://ollama.com/library/gemma4"}, {"id": "ollama-qwen3-5", "name": "Qwen 3.5", "provider": "ollama", "role": "Alibaba's open multimodal family with the widest size ladder", "context": "Varies by tag; Ollama defaults the window far lower", "price": null, "size": "0.8b, 2b, 4b, 9b, 27b, 35b, 122b — `ollama pull qwen3.5`", "strengths": ["Seven sizes from 0.8B to 122B: the easiest family to match to whatever hardware you actually have", "Vision, tool calling and thinking across the range", "Strong multilingual coverage, which the Llama builds are weaker at"], "weaknesses": ["The 122B tag is out of reach for a single consumer GPU", "Tool-calling reliability under long agentic loops still trails the hosted frontier models", "Fast-moving release cadence means tutorials and Modelfiles go stale quickly"], "docs": "https://ollama.com/library/qwen3.5"}, {"id": "ollama-gpt-oss", "name": "gpt-oss", "provider": "ollama", "role": "OpenAI's open-weight models for reasoning and agentic use", "context": "Varies by tag; Ollama defaults the window far lower", "price": null, "size": "20b, 120b — `ollama pull gpt-oss`", "strengths": ["Adjustable reasoning effort locally, which most open-weight models do not expose", "The 20B build fits a 16 GB card at 4-bit quantization, making it the practical pick for one mid-range GPU", "Built for tool use and agentic loops rather than chat alone"], "weaknesses": ["Only two sizes, so there is nothing between a 16 GB build and a 120B one", "Not updated in about a year — the Gemma 4 and Qwen 3.5 families have moved on since", "Shares a name and lineage with OpenAI's hosted models but not their quality; do not treat it as a local GPT-6"], "docs": "https://ollama.com/library/gpt-oss"}, {"id": "ollama-qwen3-coder", "name": "Qwen3-Coder", "provider": "ollama", "role": "Long-context open model aimed at agentic coding", "context": "Long-context by local standards; raise `num_ctx` to use it", "price": null, "size": "30b, 480b — `ollama pull qwen3-coder`", "strengths": ["Purpose-built for agentic coding rather than general chat", "The 30B build is the usual choice for a 24 GB card and keeps a long window at small-model speed", "A credible local option for code that must not leave the machine"], "weaknesses": ["Coding-specialised, so it is a poor general assistant", "The 480B tag is server hardware, not homelab hardware", "Well behind Opus 5.5 and GPT-6.1 Sol on long multi-file changes"], "docs": "https://ollama.com/library/qwen3-coder"}, {"id": "ollama-deepseek-r1", "name": "DeepSeek-R1", "provider": "ollama", "role": "Open reasoning family, from 1.5B to 671B", "context": "Varies by tag; Ollama defaults the window far lower", "price": null, "size": "1.5b, 7b, 8b, 14b, 32b, 70b, 671b — `ollama pull deepseek-r1`", "strengths": ["The open model that made visible chain-of-thought reasoning normal, and still a reference point for it", "The widest size range in the library, including distills that run on a laptop", "Thinking and tool tags across the family"], "weaknesses": ["About a year old: the 2026 families beat it at equivalent sizes", "The small distills carry the reasoning style without much of the reasoning ability", "Thinking output is verbose, which eats a local context window quickly"], "docs": "https://ollama.com/library/deepseek-r1"}, {"id": "ollama-llama3-1", "name": "Llama 3.1", "provider": "ollama", "role": "Meta's workhorse, still the most-pulled model in the library", "context": "Varies by tag; Ollama defaults the window far lower", "price": null, "size": "8b, 70b, 405b — `ollama pull llama3.1`", "strengths": ["The widest ecosystem support of any local model: nearly every tool, tutorial and Modelfile assumes it works", "The 8B build runs on an 8 GB card and is the safe default for a first local setup", "Reliable tool calling for its age"], "weaknesses": ["Over a year old and clearly behind Gemma 4 and Qwen 3.5 at the same sizes", "Text only — no vision, no audio", "Its popularity reflects tutorial inertia rather than current quality; pick it for compatibility, not capability"], "docs": "https://ollama.com/library/llama3.1"}]}</script>
+<script id="feed" type="application/json">{"generatedAt": "2026-10-24T09:59:33Z", "sources": {"anthropic-news": {"lastOk": null, "lastError": "FIRECRAWL_API_KEY not set"}, "anthropic-api-notes": {"lastOk": "2026-10-24T09:59:33Z", "lastError": null}, "claude-code-releases": {"lastOk": null, "lastError": "HTTP 403"}, "openai-news": {"lastOk": "2026-10-24T09:59:33Z", "lastError": null}, "nous-blog": {"lastOk": null, "lastError": "FIRECRAWL_API_KEY not set"}}, "items": [{"id": "298c8de07d18f423dad39eb2358f85464fd4cd53", "lab": "openai", "kind": "news", "title": "Rapidly scaling online storage to serve over 1 billion ChatGPT users (Part II)", "summary": "Learn how OpenAI scaled Habitat with reliable multi-tenancy, global caching, and Azure Cosmos DB to deliver 12× faster reads for ChatGPT.", "url": "https://openai.com/index/scaling-storage-one-billion-users-part-two", "publishedAt": "2026-10-23T17:00:00Z", "source": "openai-news", "firstSeenAt": "2026-10-24T09:59:33Z"}, {"id": "48e2274fdf2ba9fe48db533ddecc410e5cc41b05", "lab": "openai", "kind": "news", "title": "Securing our frontier model training environment", "summary": "OpenAI explains how we strengthened containment for frontier model training and evaluation, including offline environments and high-compute red-teaming.", "url": "https://openai.com/index/securing-our-frontier-model-training-environment", "publishedAt": "2026-10-23T10:00:00Z", "source": "openai-news", "firstSeenAt": "2026-10-24T09:59:33Z"}, {"id": "15c1f8ef7a582594bf056b85165849e9f70ce0f3", "lab": "openai", "kind": "news", "title": "OpenAI and Poland’s NASK partner to advance AI safety and security", "summary": "OpenAI and Poland’s NASK are partnering on AI safety, security, and technical research to strengthen safeguards and support a more resilient digital ecosystem.", "url": "https://openai.com/index/openai-nask-ai-safety-security-partnership", "publishedAt": "2026-10-23T00:00:00Z", "source": "openai-news", "firstSeenAt": "2026-10-24T09:59:33Z"}, {"id": "27825e300358401234fc8ca55cc275b9d4171e9a", "lab": "openai", "kind": "news", "title": "Build more responsive apps with the Decisions API", "summary": "Fast, focused, low-cost decisions for any application.", "url": "https://openai.com/index/decisions-api", "publishedAt": "2026-10-22T19:00:00Z", "source": "openai-news", "firstSeenAt": "2026-10-24T09:59:33Z"}, {"id": "63c31ca523f91ccfb067ba69d79f874951382164", "lab": "openai", "kind": "news", "title": "What FDE means at OpenAI", "summary": "What forward deployed engineering means at OpenAI", "url": "https://openai.com/index/forward-deployed-engineering-means", "publishedAt": "2026-10-22T06:00:00Z", "source": "openai-news", "firstSeenAt": "2026-10-24T09:59:33Z"}, {"id": "bd9f9e7d0e21ec722a9d6b0b879355daa6f7da6f", "lab": "anthropic", "kind": "changelog", "title": "Claude Platform release notes — October 22, 2026", "summary": "We've launched Claude Models on Google Cloud (Anthropic managed), the Claude API operated by Anthropic and reached through your Google Cloud project. Google Cloud IAM controls access. Google Cloud Marketplace handles billing. Fast mode is available for Claude Opus 5.5 on Claude…", "url": "https://platform.claude.com/docs/en/release-notes/overview#october-22-2026", "publishedAt": "2026-10-22T00:00:00Z", "source": "anthropic-api-notes", "firstSeenAt": "2026-10-24T09:59:33Z"}, {"id": "ba6fa07d677a822106bce5984f77463673ff3072", "lab": "openai", "kind": "news", "title": "Uber brings ChatGPT Work to all employees with OpenAI", "summary": "Uber is rolling out ChatGPT Work to more than 30,000 employees, helping teams research, analyze data, create presentations, and complete complex workflows.", "url": "https://openai.com/index/uber-chatgpt-work-rollout", "publishedAt": "2026-10-22T00:00:00Z", "source": "openai-news", "firstSeenAt": "2026-10-24T09:59:33Z"}, {"id": "2ed22a61b2f19a0c8004f80b27de018cfecd7ddb", "lab": "openai", "kind": "news", "title": "Broad access through consistent standards", "summary": "How OpenAI works with distribution partners to uphold consistent safeguards, support responsible access, and clarify expectations in our Usage Policies.", "url": "https://openai.com/index/broad-access-through-consistent-standards", "publishedAt": "2026-10-21T21:00:00Z", "source": "openai-news", "firstSeenAt": "2026-10-24T09:59:33Z"}, {"id": "4ab93569e260b2b0a16714b594221da5ccc8e4ab", "lab": "openai", "kind": "news", "title": "How AT&T is rethinking in-house legal work with OpenAI", "summary": "AT&T is working with OpenAI to make legal knowledge easier to access. Learn how its LegalEdge team is rethinking intake and scaling legal judgment.", "url": "https://openai.com/index/att-legal", "publishedAt": "2026-10-21T17:00:00Z", "source": "openai-news", "firstSeenAt": "2026-10-24T09:59:33Z"}, {"id": "74fcf21eca7add4a8265b1181e42f31fbfb429bc", "lab": "openai", "kind": "news", "title": "ChatGPT Ads expands to 26 new countries as over 100,000 advertisers have used the platform", "summary": "From local businesses to global brands, more advertisers can now reach people as they explore, compare and decide what to buy in ChatGPT.", "url": "https://openai.com/index/chatgpt-ads-expands-26-new-countries", "publishedAt": "2026-10-21T13:00:00Z", "source": "openai-news", "firstSeenAt": "2026-10-24T09:59:33Z"}, {"id": "61f4d0141ff303c02405716db977e4c6353bca59", "lab": "openai", "kind": "news", "title": "OpenAI models are coming to Google Cloud", "summary": "OpenAI and Google Cloud are bringing frontier models and Codex workflows to Gemini’s Model Garden, available through Google Cloud Marketplace.", "url": "https://openai.com/index/openai-models-google-cloud", "publishedAt": "2026-10-21T12:00:00Z", "source": "openai-news", "firstSeenAt": "2026-10-24T09:59:33Z"}, {"id": "d3f519557f32dd3d643c27d4c9f89095ff53a6df", "lab": "openai", "kind": "news", "title": "Patch the Planet: global response coordination as agents uncover critical vulnerabilities", "summary": "Patch the Planet connects security researchers, maintainers, and incident responders to help address critical vulnerabilities across open source.", "url": "https://openai.com/index/coordinated-disclosure-of-critical-vulnerabilities", "publishedAt": "2026-10-21T07:00:00Z", "source": "openai-news", "firstSeenAt": "2026-10-24T09:59:33Z"}, {"id": "edef63b51aedc0121d1aea11f9472c530dce47d4", "lab": "openai", "kind": "news", "title": "How we built ChatGPT’s novel ad stack for user trust and relevance", "summary": "Learn how OpenAI built ChatGPT’s LLM-powered ad stack to understand conversational intent, keep ads separate from answers, and deliver relevant ads at scale.", "url": "https://openai.com/index/building-chatgpt-ad-stack", "publishedAt": "2026-10-21T07:00:00Z", "source": "openai-news", "firstSeenAt": "2026-10-24T09:59:33Z"}, {"id": "1de8e62ff715d1f1b849a16afe7dfd3ed7898410", "lab": "openai", "kind": "news", "title": "Using thousands of AI agents to uncover new leads in biological data", "summary": "See how OpenAI, PerturbAI, and Scripps Research used distributed AI agents to uncover promising research leads in data from millions of brain cells.", "url": "https://openai.com/index/scaling-ai-research-for-complex-biological-data", "publishedAt": "2026-10-21T04:50:00Z", "source": "openai-news", "firstSeenAt": "2026-10-24T09:59:33Z"}, {"id": "5f37ecbcd3312c5c74c36093b7842f9561695db7", "lab": "anthropic", "kind": "changelog", "title": "Claude Platform release notes — October 21, 2026", "summary": "We've released API version 2026-10-21. Migrating to API version 2026-10-21 shows how to upgrade. We've released new versions of the client SDKs and the ant CLI that send API version 2026-10-21 by default: Python SDK 2.0.0, TypeScript SDK 1.0.0, C# SDK 13.0.0, Go SDK 2.0.0, Java…", "url": "https://platform.claude.com/docs/en/release-notes/overview#october-21-2026", "publishedAt": "2026-10-21T00:00:00Z", "source": "anthropic-api-notes", "firstSeenAt": "2026-10-24T09:59:33Z"}, {"id": "9201054eeb4c743a362c75cf2659f9f4fa5831f6", "lab": "openai", "kind": "news", "title": "Cloudflare links vulnerability discovery to defense with OpenAI", "summary": "Cloudflare uses OpenAI Daybreak to investigate vulnerabilities and propose fixes for review. Its developers use Codex to build faster and improve code quality.", "url": "https://openai.com/index/cloudflare-cyber", "publishedAt": "2026-10-21T00:00:00Z", "source": "openai-news", "firstSeenAt": "2026-10-24T09:59:33Z"}, {"id": "b2deaf97c98cf0ff4faa064745605c03e4946e77", "lab": "openai", "kind": "news", "title": "Democratic governance of frontier AI, part II: Empowering cyber defenders", "summary": "OpenAI outlines a blueprint for empowering cyber defenders with frontier AI, stronger safeguards, modernized cybersecurity, and more resilient public institutions.", "url": "https://openai.com/index/empowering-cyber-defenders", "publishedAt": "2026-10-21T00:00:00Z", "source": "openai-news", "firstSeenAt": "2026-10-24T09:59:33Z"}, {"id": "b3fcb2e42d321123382678ef1b3ee803b99778a9", "lab": "openai", "kind": "news", "title": "Franchisee reconciles cash in 94% less time with ChatGPT Work", "summary": "An independent Schlotzsky’s and Cinnabon franchisee cut menu repricing time by 95% and built a workflow that could free up $100K in cash flow.", "url": "https://openai.com/index/ted-taylor-restaurant", "publishedAt": "2026-10-20T10:00:00Z", "source": "openai-news", "firstSeenAt": "2026-10-24T09:59:33Z"}, {"id": "a84b6a7bee5c68a62fa1b04f99f725df56faa90e", "lab": "openai", "kind": "news", "title": "Terminal X matches senior investor judgment 88.6% with GPT-6.1", "summary": "Terminal X’s Eval Agent grades outputs against a 54-criterion rubric, catching 25% more deviances from a fund’s mandate with GPT-6.1 Sol.", "url": "https://openai.com/index/terminal-x", "publishedAt": "2026-10-20T07:00:00Z", "source": "openai-news", "firstSeenAt": "2026-10-24T09:59:33Z"}, {"id": "147e06787a3e64036d0b2ba8d44b945541c05bf6", "lab": "anthropic", "kind": "changelog", "title": "Claude Platform release notes — October 20, 2026", "summary": "The Claude Tag API is available in beta for Claude Enterprise organizations with the experimental-claude-tag-2026-10-21 beta header. Its /v1/organizations/claude_tag/ endpoints read and change Claude Tag settings on Slack channels and Slack workspaces, show which settings apply…", "url": "https://platform.claude.com/docs/en/release-notes/overview#october-20-2026", "publishedAt": "2026-10-20T00:00:00Z", "source": "anthropic-api-notes", "firstSeenAt": "2026-10-24T09:59:33Z"}, {"id": "d9a023f7b48668b2d40073777aca76b93bb02abd", "lab": "anthropic", "kind": "changelog", "title": "Claude Platform release notes — October 20, 2026", "summary": "Inference hooks are out of beta for Claude Enterprise organizations. We've launched user profiles, so you can tell Anthropic which of your end customers each API request is for. If you operate a platform or gateway, or resell API access, a safety enforcement action can then appl…", "url": "https://platform.claude.com/docs/en/release-notes/overview#october-20-2026-2", "publishedAt": "2026-10-20T00:00:00Z", "source": "anthropic-api-notes", "firstSeenAt": "2026-10-24T09:59:33Z"}, {"id": "dbaa902542534b3aef2de952931670bbaaa97f74", "lab": "openai", "kind": "news", "title": "OpenAI acquires Orchestra Bio", "summary": "OpenAI is acquiring Orchestra Bio to bring AI-powered operations to life sciences R&D, helping biopharma teams accelerate drug development and advance new treatments.", "url": "https://openai.com/index/openai-to-acquire-orchestra-bio", "publishedAt": "2026-10-20T00:00:00Z", "source": "openai-news", "firstSeenAt": "2026-10-24T09:59:33Z"}, {"id": "7a364f356aab49466020015082ef4122a7394f52", "lab": "openai", "kind": "news", "title": "Advancing coding in low‑resource programming languages", "summary": "Learn how OpenAI is improving ChatGPT across low-resource programming languages, with new evaluations for software engineering, SQLite, and COBOL migration.", "url": "https://openai.com/index/low-resource-programming-languages", "publishedAt": "2026-10-19T12:00:00Z", "source": "openai-news", "firstSeenAt": "2026-10-24T09:59:33Z"}, {"id": "65442e708214c10b88da99a535be852d30396736", "lab": "openai", "kind": "news", "title": "How Itaú is building generative AI for its entire customer base", "summary": "With ia.i, a conversational interface, and the IARA governance platform, Itaú is applying its AI First strategy to customers and employees — in one of Brazil’s most regulated sectors.", "url": "https://openai.com/index/itau-generative-ai", "publishedAt": "2026-10-16T19:00:00Z", "source": "openai-news", "firstSeenAt": "2026-10-24T09:59:33Z"}, {"id": "9db4940a53f868400a117abeba82d09071409b87", "lab": "openai", "kind": "news", "title": "Stack Overflow for Agents triples signups with ChatGPT plugin", "summary": "Two engineers shipped Stack Overflow for Agents in a few weeks with Codex, and its ChatGPT plugin helped drive up to 10× growth in agent creation.", "url": "https://openai.com/index/stack-overflow-chatgpt-plugin", "publishedAt": "2026-10-16T00:00:00Z", "source": "openai-news", "firstSeenAt": "2026-10-24T09:59:33Z"}, {"id": "4a2f3ca18eb9cee6e404d64432a48a189cc310da", "lab": "openai", "kind": "news", "title": "Benefit Street Partners answers questions faster with Codex", "summary": "Anant Kumar builds tools to compare loan valuations and analyze credit agreements, using Codex for code review and faster follow-ups.", "url": "https://openai.com/index/benefit-street-partners", "publishedAt": "2026-10-16T00:00:00Z", "source": "openai-news", "firstSeenAt": "2026-10-24T09:59:33Z"}, {"id": "a72d1e4da6b0e1062a21232ab241fb1975aaab08", "lab": "openai", "kind": "news", "title": "Bringing GPT-Rosalind to academic research labs", "summary": "Introducing the Rosalind Academic Plan, offering eligible academic labs sponsored access to GPT-Rosalind and tools to advance life sciences research.", "url": "https://openai.com/index/introducing-the-rosalind-academic-plan", "publishedAt": "2026-10-15T19:00:00Z", "source": "openai-news", "firstSeenAt": "2026-10-24T09:59:33Z"}, {"id": "fa14b8f7db4605dfa58d6966f0032b53bc43f042", "lab": "openai", "kind": "news", "title": "Teaching students to think and learn through questions", "summary": "Celebrate Teachers’ Day with AI for Educators in Brazilian Portuguese and see how Study Mode can help teachers support active, step-by-step learning.", "url": "https://openai.com/index/teaching-students-to-think-and-learn-through-questions", "publishedAt": "2026-10-15T13:00:00Z", "source": "openai-news", "firstSeenAt": "2026-10-24T09:59:33Z"}, {"id": "d8b844095dff01c8885d72761563e34a520f9fd4", "lab": "anthropic", "kind": "changelog", "title": "Claude Platform release notes — October 15, 2026", "summary": "We've added capabilities.thinking.types.between_tools to the Models API. GET /v1/models and GET /v1/models/{model_id} now report whether each model accepts thinking: {type: \"between_tools\"}, which turns off up-front thinking. See Using the Models API. The Compliance API now retu…", "url": "https://platform.claude.com/docs/en/release-notes/overview#october-15-2026-5", "publishedAt": "2026-10-15T00:00:00Z", "source": "anthropic-api-notes", "firstSeenAt": "2026-10-24T09:59:33Z"}, {"id": "dd00c04c9b95848ea0ec2f0b57fc95409902cbbb", "lab": "openai", "kind": "news", "title": "Sullivan & Cromwell brings legal expertise into agreement review", "summary": "In collaboration with OpenAI, Sullivan & Cromwell developed Agreement Analyzer, an AI tool for identifying issues in a draft agreement.", "url": "https://openai.com/index/sullivan-cromwell", "publishedAt": "2026-10-15T00:00:00Z", "source": "openai-news", "firstSeenAt": "2026-10-24T09:59:33Z"}, {"id": "a0e0fec2c2b5f568672ddffd97e5dbcc17df031b", "lab": "openai", "kind": "news", "title": "Amp puts AI agents to work beyond code with OpenAI models", "summary": "See how Amp pushes the frontier of what agents can do with GPT-6 Astra, Ultrafast, GPT-Live-1, and Sign in with ChatGPT.", "url": "https://openai.com/index/amp-beyond-coding", "publishedAt": "2026-10-14T12:00:00Z", "source": "openai-news", "firstSeenAt": "2026-10-24T09:59:33Z"}, {"id": "24cc989c02dbc2a2daf4f04185de8060d33da4a8", "lab": "openai", "kind": "news", "title": "SentinelOne cuts malware analysis from weeks to hours", "summary": "With OpenAI Daybreak, SentinelOne cuts weeks of malware analysis to hours, creating capacity to investigate more threats.", "url": "https://openai.com/index/sentinelone", "publishedAt": "2026-10-14T12:00:00Z", "source": "openai-news", "firstSeenAt": "2026-10-24T09:59:33Z"}]}</script>
+<script>
+(function () {
+  var data = JSON.parse(document.getElementById("catalog").textContent);
+  var PROVIDERS = {
+    anthropic: { label: "Anthropic", kind: "Hosted API" },
+    openai: { label: "OpenAI", kind: "Hosted API" },
+    ollama: { label: "Ollama", kind: "Local · open-weight" }
+  };
+  var MAX = 4;
+  var byId = {};
+  data.models.forEach(function (m) { byId[m.id] = m; });
+  var $ = function (id) { return document.getElementById(id); };
+  $("reviewed").textContent = data.reviewedAt;
+
+  function el(tag, attrs, text) {
+    var node = document.createElement(tag);
+    for (var k in attrs || {}) node.setAttribute(k, attrs[k]);
+    if (text != null) node.textContent = text;
+    return node;
+  }
+  // `code` spans in the catalog text become <code>; everything else stays plain text.
+  function rich(node, text) {
+    String(text).split(/(`[^`]+`)/).forEach(function (part) {
+      if (/^`[^`]+`$/.test(part)) node.appendChild(el("code", null, part.slice(1, -1)));
+      else if (part) node.appendChild(document.createTextNode(part));
+    });
+    return node;
+  }
+  function list(items) {
+    var ul = el("ul");
+    items.forEach(function (t) { ul.appendChild(rich(el("li"), t)); });
+    return ul;
+  }
+
+  // per-viewer conveniences only; the page works the same without storage
+  function load(key, fallback) { try { return JSON.parse(localStorage.getItem(key)) || fallback; } catch (e) { return fallback; } }
+  function save(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) {} }
+  var filter = load("codex-filter", "all");
+  if (filter !== "all" && !PROVIDERS[filter]) filter = "all";
+  var picked = load("codex-picked", []);
+  if (!Array.isArray(picked)) picked = [];
+  picked = picked.filter(function (id) { return byId[id]; }).slice(0, MAX);
+  var comparing = false;
+  var view = location.hash === "#models" ? "models" : "feed";
+
+  /* ---------- news feed: same rules as app/src/lib/feed.ts ---------- */
+  var feed = JSON.parse(document.getElementById("feed").textContent);
+  var LABS = { anthropic: "Anthropic", openai: "OpenAI", nous: "Nous" };
+  var KINDS = ["news", "changelog", "release"];
+  var SOURCES = {
+    "anthropic-news": "Anthropic news",
+    "anthropic-api-notes": "Claude API release notes",
+    "claude-code-releases": "Claude Code releases",
+    "openai-news": "OpenAI news",
+    "nous-blog": "Nous blog"
+  };
+  var feedLab = "all", feedKind = "all";
+  var VISIT_KEY = "llm-feed:lastVisit";
+  var lastVisit = null;
+  try { lastVisit = localStorage.getItem(VISIT_KEY); } catch (e) {}
+  try { localStorage.setItem(VISIT_KEY, new Date().toISOString().replace(/\.\d+Z$/, "Z")); } catch (e) {}
+
+  function timeAgo(iso) {
+    var minutes = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
+    if (minutes < 60) return minutes + "m ago";
+    var hours = Math.round(minutes / 60);
+    return hours < 48 ? hours + "h ago" : Math.round(hours / 24) + "d ago";
+  }
+  function formatDay(iso, dateOnly) {
+    return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: dateOnly ? "UTC" : undefined });
+  }
+
+  function chipRow(box, options, names, current, onPick) {
+    Array.prototype.slice.call(box.querySelectorAll("button")).forEach(function (b) { b.remove(); });
+    ["all"].concat(options).forEach(function (o) {
+      var b = el("button", { class: "chip" + (names && names[o] ? " lab-" + o : ""), type: "button", "aria-pressed": String(o === current) },
+        o === "all" ? "All" : (names ? names[o] : o));
+      b.addEventListener("click", function () { onPick(o); });
+      box.appendChild(b);
+    });
+  }
+
+  function renderFeed() {
+    var status = $("feed-status");
+    status.textContent = "";
+    if (feed.generatedAt) {
+      status.appendChild(document.createTextNode("Updated "));
+      status.appendChild(el("b", null, timeAgo(feed.generatedAt)));
+      status.appendChild(document.createTextNode(" \u00b7 last pull " + new Date(feed.generatedAt).toUTCString().replace(/:\d\d GMT$/, " UTC")));
+    } else {
+      status.textContent = "No pull has run yet.";
+    }
+
+    var stale = Object.keys(feed.sources || {}).filter(function (id) { return feed.sources[id].lastError; });
+    var banner = $("feed-stale");
+    banner.textContent = "";
+    banner.hidden = stale.length === 0;
+    if (stale.length) {
+      banner.appendChild(document.createTextNode("Not refreshed on the last pull, so these show their last good items:"));
+      var ul = el("ul");
+      stale.forEach(function (id) { ul.appendChild(el("li", null, (SOURCES[id] || id) + " \u2014 " + feed.sources[id].lastError)); });
+      banner.appendChild(ul);
+    }
+
+    chipRow($("feed-labs"), Object.keys(LABS), LABS, feedLab, function (o) { feedLab = o; renderFeed(); });
+    chipRow($("feed-kinds"), KINDS, null, feedKind, function (o) { feedKind = o; renderFeed(); });
+
+    var list = $("stories");
+    list.textContent = "";
+    var shown = feed.items.filter(function (it) {
+      return (feedLab === "all" || it.lab === feedLab) && (feedKind === "all" || it.kind === feedKind);
+    });
+    if (!shown.length) {
+      list.appendChild(el("li", { class: "empty" }, feed.items.length ? "Nothing matches these filters." : "No stories yet. They appear after the next pull."));
+      return;
+    }
+    shown.forEach(function (it) {
+      var li = el("li", { class: "story lab-" + it.lab });
+      var meta = el("div", { class: "meta" });
+      meta.appendChild(el("span", { class: "tag" }, LABS[it.lab] || it.lab));
+      meta.appendChild(el("span", null, it.kind));
+      meta.appendChild(el("span", null, formatDay(it.publishedAt || it.firstSeenAt, it.source === "anthropic-news") + (it.publishedAt === null ? " (first seen)" : "")));
+      if (lastVisit !== null && it.firstSeenAt > lastVisit) meta.appendChild(el("span", { class: "new" }, "new"));
+      li.appendChild(meta);
+      var h = el("h2");
+      if (/^https?:\/\//i.test(it.url)) h.appendChild(el("a", { href: it.url, target: "_blank", rel: "noopener noreferrer" }, it.title));
+      else h.textContent = it.title;
+      li.appendChild(h);
+      if (it.summary) li.appendChild(el("p", null, it.summary));
+      list.appendChild(li);
+    });
+  }
+
+  document.querySelectorAll("[data-view]").forEach(function (b) {
+    b.addEventListener("click", function () { view = b.dataset.view; comparing = false; render(); window.scrollTo(0, 0); });
+  });
+
+  /* ---------- catalog ---------- */
+  function card(m) {
+    var li = el("li", { class: "model lab-" + m.provider });
+    if (picked.indexOf(m.id) >= 0) li.classList.add("picked");
+    var head = el("header");
+    head.appendChild(el("h3", null, m.name));
+    head.appendChild(el("p", { class: "role" }, m.role));
+    li.appendChild(head);
+    var dl = el("dl", { class: "spec" });
+    [["Context", m.context], ["Price", m.price], ["Sizes", m.size]].forEach(function (row) {
+      if (!row[1]) return;
+      dl.appendChild(el("dt", null, row[0]));
+      dl.appendChild(rich(el("dd"), row[1]));
+    });
+    li.appendChild(dl);
+    var v = el("div", { class: "verdict" });
+    var pro = el("div", { class: "pro" }); pro.appendChild(el("h4", null, "Strengths")); pro.appendChild(list(m.strengths));
+    var con = el("div", { class: "con" }); con.appendChild(el("h4", null, "Weaknesses")); con.appendChild(list(m.weaknesses));
+    v.appendChild(pro); v.appendChild(con);
+    li.appendChild(v);
+
+    var foot = el("div", { class: "foot" });
+    if (/^https:\/\//.test(m.docs)) foot.appendChild(el("a", { class: "docs", href: m.docs, target: "_blank", rel: "noopener" }, "Docs →"));
+    else foot.appendChild(el("span"));
+    var on = picked.indexOf(m.id) >= 0;
+    var btn = el("button", { class: "chip", type: "button", "aria-pressed": String(on) }, on ? "✓ Comparing" : "+ Compare");
+    if (!on && picked.length >= MAX) { btn.disabled = true; btn.title = "Compare up to " + MAX + " models at once"; }
+    btn.addEventListener("click", function () { toggle(m.id); });
+    foot.appendChild(btn);
+    li.appendChild(foot);
+    return li;
+  }
+
+  function renderCatalog() {
+    var bands = $("bands");
+    bands.textContent = "";
+    var shown = 0;
+    Object.keys(PROVIDERS).forEach(function (p) {
+      if (filter !== "all" && filter !== p) return;
+      var models = data.models.filter(function (m) { return m.provider === p; });
+      if (!models.length) return;
+      shown += models.length;
+      var sec = el("section", { class: "band lab-" + p, "aria-label": PROVIDERS[p].label });
+      var head = el("div", { class: "band-head" });
+      head.appendChild(el("h2", null, PROVIDERS[p].label));
+      head.appendChild(el("span", { class: "kind" }, PROVIDERS[p].kind));
+      head.appendChild(el("span", { class: "n" }, models.length + " models"));
+      var inner = el("div", { class: "band-in" });
+      inner.appendChild(head);
+      var ul = el("ul", { class: "models" });
+      models.forEach(function (m) { ul.appendChild(card(m)); });
+      inner.appendChild(ul);
+      sec.appendChild(inner);
+      bands.appendChild(sec);
+    });
+    $("count").textContent = shown + (shown === 1 ? " model" : " models");
+    Array.prototype.forEach.call($("filters").children, function (b) {
+      b.setAttribute("aria-pressed", String((b.dataset.p || "all") === filter));
+    });
+  }
+
+  var all = el("button", { class: "chip", type: "button" }, "All");
+  all.addEventListener("click", function () { filter = "all"; save("codex-filter", filter); renderCatalog(); });
+  $("filters").appendChild(all);
+  Object.keys(PROVIDERS).forEach(function (p) {
+    var b = el("button", { class: "chip lab-" + p, type: "button", "data-p": p }, PROVIDERS[p].label);
+    b.addEventListener("click", function () { filter = p; save("codex-filter", filter); renderCatalog(); });
+    $("filters").appendChild(b);
+  });
+
+  /* ---------- picking ---------- */
+  function toggle(id) {
+    var i = picked.indexOf(id);
+    if (i >= 0) picked.splice(i, 1);
+    else if (picked.length < MAX) picked.push(id);
+    save("codex-picked", picked);
+    render();
+  }
+  function clear() { picked = []; save("codex-picked", picked); comparing = false; render(); }
+  $("clear").addEventListener("click", clear);
+  $("clear-2").addEventListener("click", clear);
+
+  function renderTray() {
+    $("tray").hidden = comparing || picked.length === 0;
+    $("tray-label").textContent = picked.length + " of " + MAX + " picked";
+    var picks = $("picks");
+    picks.textContent = "";
+    picked.forEach(function (id) {
+      var m = byId[id];
+      var chip = el("span", { class: "pick lab-" + m.provider }, m.name);
+      var x = el("button", { type: "button", "aria-label": "Remove " + m.name }, "×");
+      x.addEventListener("click", function () { toggle(id); });
+      chip.appendChild(x);
+      picks.appendChild(chip);
+    });
+    $("go").disabled = picked.length < 2;
+    $("go").title = picked.length < 2 ? "Pick at least 2 models" : "";
+  }
+
+  /* ---------- compare ---------- */
+  var ROWS = [
+    ["Role", function (m) { return m.role; }],
+    ["Context", function (m) { return m.context; }, "mono"],
+    ["Price", function (m) { return m.price || (m.provider === "ollama" ? "No API price, runs locally" : null); }, "mono"],
+    ["Sizes", function (m) { return m.size; }, "mono"],
+    ["Strengths", function (m) { return m.strengths; }, "pro"],
+    ["Weaknesses", function (m) { return m.weaknesses; }, "con"],
+    ["Docs", function (m) { return m.docs; }, "link"]
+  ];
+  function renderCompare() {
+    var models = picked.map(function (id) { return byId[id]; });
+    $("compare-title").textContent = "Comparing " + models.length + " models";
+    var t = $("cmp");
+    t.textContent = "";
+    var thead = el("thead"), hr = el("tr");
+    hr.appendChild(el("th", { scope: "col" }));
+    models.forEach(function (m) {
+      var th = el("th", { scope: "col", class: "lab-" + m.provider });
+      th.appendChild(el("span", { class: "prov" }, PROVIDERS[m.provider].label));
+      th.appendChild(el("span", { class: "name" }, m.name));
+      hr.appendChild(th);
+    });
+    thead.appendChild(hr);
+    t.appendChild(thead);
+    var tbody = el("tbody");
+    ROWS.forEach(function (row) {
+      var values = models.map(row[1]);
+      if (values.every(function (v) { return !v; })) return;
+      var tr = el("tr");
+      tr.appendChild(el("th", { scope: "row" }, row[0]));
+      values.forEach(function (v) {
+        var td = el("td", row[2] ? { class: row[2] } : null);
+        if (!v) { td.className = "none"; td.textContent = "Not listed"; }
+        else if (Array.isArray(v)) td.appendChild(list(v));
+        else if (row[2] === "link") {
+          if (/^https:\/\//.test(v)) td.appendChild(el("a", { href: v, target: "_blank", rel: "noopener" }, "Docs →"));
+        } else rich(td, v);
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+    t.appendChild(tbody);
+  }
+
+  $("go").addEventListener("click", function () { comparing = true; render(); window.scrollTo(0, 0); });
+  $("back").addEventListener("click", function () { comparing = false; render(); });
+
+  function render() {
+    if (comparing && picked.length < 2) comparing = false;
+    var onModels = view === "models";
+    document.querySelectorAll("[data-view]").forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.view === view)); });
+    $("feed-view").hidden = onModels;
+    $("catalog-view").hidden = !onModels || comparing;
+    $("compare-view").hidden = !onModels || !comparing;
+    if (!onModels) renderFeed();
+    else if (comparing) renderCompare(); else renderCatalog();
+    if (onModels) renderTray(); else $("tray").hidden = true;
+  }
+  render();
+})();
+</script>

@@ -14,6 +14,10 @@ models with strengths and weaknesses. One stdlib-only Python process (`serve.py`
 the committed React build and refreshes the feed itself daily. No Docker, no host cron,
 no Proxmox, no Node at runtime.
 
+Knowledge base (read first; keep it current): `docs/knowledge-base/README.md` — how the pieces
+fit, the published site, the daily refresh, environment setup, design decisions, troubleshooting.
+All new documentation goes there as markdown pages linked from its index.
+
 Design: `docs/superpowers/specs/2026-10-05-llm-feed-dashboard-design.md`.
 Model catalog page plan: `docs/superpowers/plans/2026-10-06-model-catalog-page.md`.
 Plan (implemented): `docs/superpowers/plans/2026-10-05-llm-feed-dashboard.md`.
@@ -22,7 +26,8 @@ Hardening plan (H1-H6 done, H7 docs, H8 open): `docs/superpowers/plans/2026-10-0
 ## Commands
 
 ```sh
-.venv/bin/python -m pytest              # 139 tests, no network, no credits
+.venv/bin/python -m pytest              # 169 tests, no network, no credits
+python3 site/build.py                   # rebuild the published site (site/index.html)
 python3 serve.py                        # http://127.0.0.1:8787, scheduler included
 python3 -m feed pull                    # fetch, merge, prune by hand (--data DIR)
 python3 -m feed prune                   # prune only, offline
@@ -37,6 +42,8 @@ Dev setup: `python3 -m venv .venv && .venv/bin/pip install pytest`. Python 3.10+
 `schedule`, `__main__`); `serve.py` is the server and scheduler thread; `app/` is the UI
 source and `app/dist/index.html` is its committed single-file build; `tests/` has one
 module per feed module plus `fixtures.py`. `data/` is runtime state and git-ignored.
+`site/` is the published Artifact page: `template.html` + `build.py` (stdlib) → `index.html`,
+refreshed daily by a Claude scheduled task (see `docs/knowledge-base/daily-refresh.md`).
 
 In `app/src/`: `App.tsx` is the shell (masthead, nav, hash route), `Feed.tsx` and
 `Models.tsx` are the two pages, `Chips.tsx` is the filter row both use, `lib/feed.ts` and

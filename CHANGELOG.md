@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+- Added `docs/knowledge-base/`, the project's single indexed documentation home: how the pieces fit,
+  the published site, the daily refresh scheduled task, environment setup (allowing `github.com`,
+  adding the Firecrawl key), design decisions with sources, troubleshooting and a glossary.
+  `AGENTS.md` now points to it first and lists `site/`; `site/README.md` is a short pointer to it.
+- Calmed the `site/` theme for long reading: one dark surface (`#181818` page, `#222222` cards,
+  `#e6e6e6` text), brand colours as accents only (heading, card strip, tag outline) instead of
+  full-width orange/white/black bands, no scanline texture. All text 5:1 contrast or better.
+- Added a news feed page to `site/` (now the default tab, beside Models): `site/build.py` inlines the
+  pulled `data/items.json`, checked with the same shape rules as `app/src/lib/feed.ts` (a corrupt file
+  stops the build, only http(s) links), and the page shows the merged chronological feed with lab/kind
+  filters, last-pull time, a stale-source banner, "first seen" dates and the "new" badge.
+- Added `site/`, a standalone single-file model codex page published as a claude.ai Artifact
+  (not served by `serve.py`, so no new served path). Full-width bands in each provider's brand
+  colours, one neutral dark card for every model, a provider filter, and a pick-2-to-4 side-by-side
+  compare. `site/build.py` (stdlib only) inlines `app/src/models.json` into `site/template.html`
+  and writes the committed `site/index.html`. No navy or blue-tinted colours; card text is 7:1
+  contrast or better. No new dependencies.
 - Added `.claude/launch.json` so the dev server (`npm --prefix app run dev`, port 5173) can
   be launched and previewed from Claude Code without hand-wiring the command each time.
 - Reshaped the model catalog at `#/models` from a stacked list of full-height cards into a
