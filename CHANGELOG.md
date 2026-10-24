@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Calmed the `site/` theme for long reading: one dark surface (`#181818` page, `#222222` cards,
+  `#e6e6e6` text), brand colours as accents only (heading, card strip, tag outline) instead of
+  full-width orange/white/black bands, no scanline texture. All text 5:1 contrast or better.
 - Added a news feed page to `site/` (now the default tab, beside Models): `site/build.py` inlines the
   pulled `data/items.json`, checked with the same shape rules as `app/src/lib/feed.ts` (a corrupt file
   stops the build, only http(s) links), and the page shows the merged chronological feed with lab/kind
