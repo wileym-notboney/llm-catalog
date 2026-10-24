@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Added a news feed page to `site/` (now the default tab, beside Models): `site/build.py` inlines the
+  pulled `data/items.json`, checked with the same shape rules as `app/src/lib/feed.ts` (a corrupt file
+  stops the build, only http(s) links), and the page shows the merged chronological feed with lab/kind
+  filters, last-pull time, a stale-source banner, "first seen" dates and the "new" badge.
 - Added `site/`, a standalone single-file model codex page published as a claude.ai Artifact
   (not served by `serve.py`, so no new served path). Full-width bands in each provider's brand
   colours, one neutral dark card for every model, a provider filter, and a pick-2-to-4 side-by-side

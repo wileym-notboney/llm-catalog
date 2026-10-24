@@ -4,8 +4,9 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
-/* Layout: one column. Masthead, provider filter, then one tinted band per provider.
-   Picking models fills a tray at the bottom; Compare swaps the bands for a side-by-side table.
+/* Layout: masthead with two tabs. News feed: one merged chronological list of stories from the
+   repo's daily pull. Models: provider filter, then one full-width band per provider; picking models
+   fills a tray at the bottom and Compare swaps the bands for a side-by-side table.
    Dark only by choice: the Mythological Punk theme is a single visual world. */
 :root {
   /* neutral graphite page: the provider bands carry all the colour */
@@ -104,6 +105,7 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--primary); outli
 .lab-openai {
   --ground: #ffffff; --on-ground: #000000; --edge: #ffffff; --strip: #ffffff;
 }
+.lab-nous { --ground: transparent; --on-ground: var(--text); --edge: var(--muted); --strip: var(--muted); }
 .lab-ollama {
   --ground: #000000; --on-ground: #ffffff; --edge: #ffffff; --strip: #ffffff;
 }
@@ -112,6 +114,7 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--primary); outli
 .catalog { padding-top: 24px; display: grid; gap: 24px; }
 #bands { display: grid; }
 .catalog > .wrap { width: 100%; }
+.catalog-tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .chips .chip[data-p]::before {
   content: "";
@@ -195,6 +198,46 @@ code { color: var(--accent); font-family: var(--font-mono); }
 .model .foot { margin-top: auto; padding-top: 6px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .docs { font: 500 0.8rem var(--font-mono); color: var(--c-link, var(--primary)); text-decoration: underline; text-underline-offset: 3px; }
 
+/* ---------- tabs ---------- */
+.tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+.tabs .chip { font-size: 0.9rem; padding: 6px 16px; }
+
+/* ---------- news feed ---------- */
+.feed-view { padding-top: 24px; display: grid; gap: 16px; }
+.status { margin: 0; font: 0.8rem var(--font-mono); color: var(--muted); }
+.status b { color: var(--text); font-weight: 500; }
+.banner { margin: 0; padding: 10px 14px; border-left: 3px solid var(--accent); background: rgba(211, 168, 73, 0.1); font-size: 0.88rem; }
+.banner ul { margin: 4px 0 0; padding-left: 1.1em; }
+.filters { display: flex; flex-wrap: wrap; gap: 10px 28px; }
+.filter-group { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.filter-group > span { font: 600 0.68rem var(--font-mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin-right: 4px; }
+.stories { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.story {
+  display: grid;
+  gap: 6px;
+  padding: 14px 18px;
+  min-width: 0;
+  background: #1e1e1e;
+  border-left: 4px solid var(--strip);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+.story .meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; font: 0.76rem var(--font-mono); color: var(--muted); }
+.tag {
+  padding: 1px 8px;
+  background: var(--ground);
+  color: var(--on-ground);
+  border: 1px solid var(--edge);
+  font: 600 0.7rem var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.new { color: var(--bg); background: var(--accent); padding: 0 6px; font-weight: 600; }
+.story h2 { margin: 0; font: 600 1.05rem/1.35 var(--font-body); }
+.story h2 a { color: var(--text); text-decoration: underline; text-decoration-color: rgba(255, 255, 255, 0.3); text-underline-offset: 3px; }
+.story h2 a:hover { text-decoration-color: var(--accent); }
+.story p { margin: 0; color: #c8c8c8; font-size: 0.9rem; max-width: 75ch; overflow-wrap: anywhere; }
+.empty { color: var(--muted); }
+
 /* ---------- compare tray ---------- */
 .tray {
   position: fixed;
@@ -267,15 +310,31 @@ footer { margin-top: 40px; padding-block: 24px; border-top: 1px solid var(--line
   <header class="masthead">
     <span class="brand">
       <svg role="img" aria-label="LLM Feed crest"><use href="#crest"/></svg>
-      <span><b>LLM Feed</b><small>Model codex</small></span>
+      <span><b>LLM Feed</b><small>Anthropic &middot; OpenAI &middot; Nous &middot; Ollama</small></span>
     </span>
-    <span class="stamp">Reviewed <b id="reviewed"></b> &middot; <span id="count"></span></span>
+    <nav class="tabs" aria-label="Pages">
+      <button class="chip" type="button" data-view="feed">News feed</button>
+      <button class="chip" type="button" data-view="models">Models</button>
+    </nav>
   </header>
+
+  <main class="feed-view" id="feed-view">
+    <p class="status" id="feed-status"></p>
+    <div class="banner" id="feed-stale" role="status" hidden></div>
+    <div class="filters">
+      <div class="filter-group" role="group" aria-label="Filter by lab" id="feed-labs"><span>Lab</span></div>
+      <div class="filter-group" role="group" aria-label="Filter by kind" id="feed-kinds"><span>Kind</span></div>
+    </div>
+    <ol class="stories" id="stories"></ol>
+  </main>
 
 </div>
 
 <main class="catalog" id="catalog-view">
-  <div class="wrap"><div class="chips" role="group" aria-label="Filter by provider" id="filters"></div></div>
+  <div class="wrap catalog-tools">
+    <div class="chips" role="group" aria-label="Filter by provider" id="filters"></div>
+    <span class="stamp">Reviewed <b id="reviewed"></b> &middot; <span id="count"></span></span>
+  </div>
   <div id="bands"></div>
 </main>
 
@@ -308,6 +367,7 @@ footer { margin-top: 40px; padding-block: 24px; border-top: 1px solid var(--line
 </div>
 
 <script id="catalog" type="application/json">__CATALOG__</script>
+<script id="feed" type="application/json">__FEED__</script>
 <script>
 (function () {
   var data = JSON.parse(document.getElementById("catalog").textContent);
@@ -351,6 +411,99 @@ footer { margin-top: 40px; padding-block: 24px; border-top: 1px solid var(--line
   if (!Array.isArray(picked)) picked = [];
   picked = picked.filter(function (id) { return byId[id]; }).slice(0, MAX);
   var comparing = false;
+  var view = location.hash === "#models" ? "models" : "feed";
+
+  /* ---------- news feed: same rules as app/src/lib/feed.ts ---------- */
+  var feed = JSON.parse(document.getElementById("feed").textContent);
+  var LABS = { anthropic: "Anthropic", openai: "OpenAI", nous: "Nous" };
+  var KINDS = ["news", "changelog", "release"];
+  var SOURCES = {
+    "anthropic-news": "Anthropic news",
+    "anthropic-api-notes": "Claude API release notes",
+    "claude-code-releases": "Claude Code releases",
+    "openai-news": "OpenAI news",
+    "nous-blog": "Nous blog"
+  };
+  var feedLab = "all", feedKind = "all";
+  var VISIT_KEY = "llm-feed:lastVisit";
+  var lastVisit = null;
+  try { lastVisit = localStorage.getItem(VISIT_KEY); } catch (e) {}
+  try { localStorage.setItem(VISIT_KEY, new Date().toISOString().replace(/\.\d+Z$/, "Z")); } catch (e) {}
+
+  function timeAgo(iso) {
+    var minutes = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
+    if (minutes < 60) return minutes + "m ago";
+    var hours = Math.round(minutes / 60);
+    return hours < 48 ? hours + "h ago" : Math.round(hours / 24) + "d ago";
+  }
+  function formatDay(iso, dateOnly) {
+    return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: dateOnly ? "UTC" : undefined });
+  }
+
+  function chipRow(box, options, names, current, onPick) {
+    Array.prototype.slice.call(box.querySelectorAll("button")).forEach(function (b) { b.remove(); });
+    ["all"].concat(options).forEach(function (o) {
+      var b = el("button", { class: "chip" + (names && names[o] ? " lab-" + o : ""), type: "button", "aria-pressed": String(o === current) },
+        o === "all" ? "All" : (names ? names[o] : o));
+      b.addEventListener("click", function () { onPick(o); });
+      box.appendChild(b);
+    });
+  }
+
+  function renderFeed() {
+    var status = $("feed-status");
+    status.textContent = "";
+    if (feed.generatedAt) {
+      status.appendChild(document.createTextNode("Updated "));
+      status.appendChild(el("b", null, timeAgo(feed.generatedAt)));
+      status.appendChild(document.createTextNode(" \u00b7 last pull " + new Date(feed.generatedAt).toUTCString().replace(/:\d\d GMT$/, " UTC")));
+    } else {
+      status.textContent = "No pull has run yet.";
+    }
+
+    var stale = Object.keys(feed.sources || {}).filter(function (id) { return feed.sources[id].lastError; });
+    var banner = $("feed-stale");
+    banner.textContent = "";
+    banner.hidden = stale.length === 0;
+    if (stale.length) {
+      banner.appendChild(document.createTextNode("Not refreshed on the last pull, so these show their last good items:"));
+      var ul = el("ul");
+      stale.forEach(function (id) { ul.appendChild(el("li", null, (SOURCES[id] || id) + " \u2014 " + feed.sources[id].lastError)); });
+      banner.appendChild(ul);
+    }
+
+    chipRow($("feed-labs"), Object.keys(LABS), LABS, feedLab, function (o) { feedLab = o; renderFeed(); });
+    chipRow($("feed-kinds"), KINDS, null, feedKind, function (o) { feedKind = o; renderFeed(); });
+
+    var list = $("stories");
+    list.textContent = "";
+    var shown = feed.items.filter(function (it) {
+      return (feedLab === "all" || it.lab === feedLab) && (feedKind === "all" || it.kind === feedKind);
+    });
+    if (!shown.length) {
+      list.appendChild(el("li", { class: "empty" }, feed.items.length ? "Nothing matches these filters." : "No stories yet. They appear after the next pull."));
+      return;
+    }
+    shown.forEach(function (it) {
+      var li = el("li", { class: "story lab-" + it.lab });
+      var meta = el("div", { class: "meta" });
+      meta.appendChild(el("span", { class: "tag" }, LABS[it.lab] || it.lab));
+      meta.appendChild(el("span", null, it.kind));
+      meta.appendChild(el("span", null, formatDay(it.publishedAt || it.firstSeenAt, it.source === "anthropic-news") + (it.publishedAt === null ? " (first seen)" : "")));
+      if (lastVisit !== null && it.firstSeenAt > lastVisit) meta.appendChild(el("span", { class: "new" }, "new"));
+      li.appendChild(meta);
+      var h = el("h2");
+      if (/^https?:\/\//i.test(it.url)) h.appendChild(el("a", { href: it.url, target: "_blank", rel: "noopener noreferrer" }, it.title));
+      else h.textContent = it.title;
+      li.appendChild(h);
+      if (it.summary) li.appendChild(el("p", null, it.summary));
+      list.appendChild(li);
+    });
+  }
+
+  document.querySelectorAll("[data-view]").forEach(function (b) {
+    b.addEventListener("click", function () { view = b.dataset.view; comparing = false; render(); window.scrollTo(0, 0); });
+  });
 
   /* ---------- catalog ---------- */
   function card(m) {
@@ -501,10 +654,14 @@ footer { margin-top: 40px; padding-block: 24px; border-top: 1px solid var(--line
 
   function render() {
     if (comparing && picked.length < 2) comparing = false;
-    $("catalog-view").hidden = comparing;
-    $("compare-view").hidden = !comparing;
-    if (comparing) renderCompare(); else renderCatalog();
-    renderTray();
+    var onModels = view === "models";
+    document.querySelectorAll("[data-view]").forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.view === view)); });
+    $("feed-view").hidden = onModels;
+    $("catalog-view").hidden = !onModels || comparing;
+    $("compare-view").hidden = !onModels || !comparing;
+    if (!onModels) renderFeed();
+    else if (comparing) renderCompare(); else renderCatalog();
+    if (onModels) renderTray(); else $("tray").hidden = true;
   }
   render();
 })();
