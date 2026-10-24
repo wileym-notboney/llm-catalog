@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Added `docs/knowledge-base/`, the project's single indexed documentation home: how the pieces fit,
+  the published site, the daily refresh scheduled task, environment setup (allowing `github.com`,
+  adding the Firecrawl key), design decisions with sources, troubleshooting and a glossary.
+  `AGENTS.md` now points to it first and lists `site/`; `site/README.md` is a short pointer to it.
 - Calmed the `site/` theme for long reading: one dark surface (`#181818` page, `#222222` cards,
   `#e6e6e6` text), brand colours as accents only (heading, card strip, tag outline) instead of
   full-width orange/white/black bands, no scanline texture. All text 5:1 contrast or better.
